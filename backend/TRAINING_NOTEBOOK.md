@@ -27,9 +27,7 @@ uploaded = files.upload()
 
 import torch
 print(f"✅ Setup complete! GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'}")
-# Login to kagglehub if needed
-import kagglehub
-kagglehub.login()
+# (No login needed since we used kaggle.json)
 ```
 
 ### Cell 2: Download & Train
