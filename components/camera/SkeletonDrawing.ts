@@ -1,88 +1,179 @@
 'use client';
 
-// Canvas drawing utilities for skeleton visualization
+// Refined skeleton drawing utilities
 
-// MediaPipe connection pairs for skeleton
+// Pose connections (main body)
 export const POSE_CONNECTIONS = [
-    [0, 1], [1, 2], [2, 3], [3, 7], // Right eye
-    [0, 4], [4, 5], [5, 6], [6, 8], // Left eye
+    // Face outline
+    [0, 1], [1, 2], [2, 3], [3, 7],  // Right eyebrow
+    [0, 4], [4, 5], [5, 6], [6, 8],  // Left eyebrow
     [9, 10], // Mouth
+    // Torso
     [11, 12], // Shoulders
+    [11, 23], [12, 24], // Shoulder to hip
+    [23, 24], // Hips
+    // Arms
     [11, 13], [13, 15], // Left arm
     [12, 14], [14, 16], // Right arm
-    [11, 23], [12, 24], // Torso
-    [23, 24], // Hips
-    [23, 25], [25, 27], // Left leg
-    [24, 26], [26, 28], // Right leg
+    // Legs (optional - uncomment if needed)
+    // [23, 25], [25, 27], // Left leg
+    // [24, 26], [26, 28], // Right leg
 ];
 
+// Hand connections
 export const HAND_CONNECTIONS = [
-    [0, 1], [1, 2], [2, 3], [3, 4], // Thumb
-    [0, 5], [5, 6], [6, 7], [7, 8], // Index
-    [0, 9], [9, 10], [10, 11], [11, 12], // Middle
-    [0, 13], [13, 14], [14, 15], [15, 16], // Ring
-    [0, 17], [17, 18], [18, 19], [19, 20], // Pinky
-    [5, 9], [9, 13], [13, 17], // Palm
+    // Thumb
+    [0, 1], [1, 2], [2, 3], [3, 4],
+    // Index
+    [0, 5], [5, 6], [6, 7], [7, 8],
+    // Middle
+    [0, 9], [9, 10], [10, 11], [11, 12],
+    // Ring
+    [0, 13], [13, 14], [14, 15], [15, 16],
+    // Pinky
+    [0, 17], [17, 18], [18, 19], [19, 20],
+    // Palm
+    [5, 9], [9, 13], [13, 17],
 ];
 
-interface DrawOptions {
-    color?: string;
-    lineWidth?: number;
-    pointRadius?: number;
+// Check if landmark is valid (not zero/empty)
+function isValidLandmark(lm: number[]): boolean {
+    return lm && (Math.abs(lm[0]) > 0.001 || Math.abs(lm[1]) > 0.001);
 }
 
-export function drawLandmarks(
+// Draw smooth line between two points with gradient
+function drawSmoothLine(
     ctx: CanvasRenderingContext2D,
-    landmarks: number[][],
-    width: number,
-    height: number,
-    options: DrawOptions = {}
+    x1: number, y1: number,
+    x2: number, y2: number,
+    color: string,
+    lineWidth: number = 2
 ) {
-    const { color = '#00ff00', pointRadius = 3 } = options;
-
-    ctx.fillStyle = color;
-
-    for (const lm of landmarks) {
-        if (lm[0] === 0 && lm[1] === 0 && lm[2] === 0) continue; // Skip empty
-
-        const x = lm[0] * width;
-        const y = lm[1] * height;
-
-        ctx.beginPath();
-        ctx.arc(x, y, pointRadius, 0, 2 * Math.PI);
-        ctx.fill();
-    }
-}
-
-export function drawConnections(
-    ctx: CanvasRenderingContext2D,
-    landmarks: number[][],
-    connections: number[][],
-    width: number,
-    height: number,
-    options: DrawOptions = {}
-) {
-    const { color = '#00ff00', lineWidth = 2 } = options;
-
+    ctx.beginPath();
     ctx.strokeStyle = color;
     ctx.lineWidth = lineWidth;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+}
 
-    for (const [i, j] of connections) {
+// Draw a glowing point
+function drawGlowPoint(
+    ctx: CanvasRenderingContext2D,
+    x: number, y: number,
+    radius: number,
+    color: string
+) {
+    // Outer glow
+    const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius * 2);
+    gradient.addColorStop(0, color);
+    gradient.addColorStop(0.5, color + '88');
+    gradient.addColorStop(1, 'transparent');
+
+    ctx.beginPath();
+    ctx.fillStyle = gradient;
+    ctx.arc(x, y, radius * 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Inner solid point
+    ctx.beginPath();
+    ctx.fillStyle = color;
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+// Draw hand skeleton
+function drawHand(
+    ctx: CanvasRenderingContext2D,
+    landmarks: number[][],
+    width: number,
+    height: number,
+    color: string
+) {
+    // Check if hand is detected (at least some valid landmarks)
+    const validCount = landmarks.filter(isValidLandmark).length;
+    if (validCount < 5) return;
+
+    // Draw connections first (behind points)
+    ctx.globalAlpha = 0.8;
+    for (const [i, j] of HAND_CONNECTIONS) {
         if (i >= landmarks.length || j >= landmarks.length) continue;
 
         const start = landmarks[i];
         const end = landmarks[j];
 
-        // Skip if either point is empty
-        if ((start[0] === 0 && start[1] === 0) || (end[0] === 0 && end[1] === 0)) continue;
+        if (!isValidLandmark(start) || !isValidLandmark(end)) continue;
 
-        ctx.beginPath();
-        ctx.moveTo(start[0] * width, start[1] * height);
-        ctx.lineTo(end[0] * width, end[1] * height);
-        ctx.stroke();
+        const x1 = start[0] * width;
+        const y1 = start[1] * height;
+        const x2 = end[0] * width;
+        const y2 = end[1] * height;
+
+        drawSmoothLine(ctx, x1, y1, x2, y2, color, 3);
+    }
+
+    // Draw points on top
+    ctx.globalAlpha = 1;
+    for (let i = 0; i < landmarks.length; i++) {
+        const lm = landmarks[i];
+        if (!isValidLandmark(lm)) continue;
+
+        const x = lm[0] * width;
+        const y = lm[1] * height;
+
+        // Highlight fingertips
+        const isFingertip = [4, 8, 12, 16, 20].includes(i);
+        drawGlowPoint(ctx, x, y, isFingertip ? 5 : 3, color);
     }
 }
 
+// Draw pose skeleton
+function drawPose(
+    ctx: CanvasRenderingContext2D,
+    landmarks: number[][],
+    width: number,
+    height: number
+) {
+    const validCount = landmarks.filter(isValidLandmark).length;
+    if (validCount < 5) return;
+
+    const color = '#22c55e'; // Green
+
+    // Draw connections
+    ctx.globalAlpha = 0.6;
+    for (const [i, j] of POSE_CONNECTIONS) {
+        if (i >= landmarks.length || j >= landmarks.length) continue;
+
+        const start = landmarks[i];
+        const end = landmarks[j];
+
+        if (!isValidLandmark(start) || !isValidLandmark(end)) continue;
+
+        const x1 = start[0] * width;
+        const y1 = start[1] * height;
+        const x2 = end[0] * width;
+        const y2 = end[1] * height;
+
+        drawSmoothLine(ctx, x1, y1, x2, y2, color, 2);
+    }
+
+    // Draw key points only (shoulders, elbows, wrists)
+    ctx.globalAlpha = 1;
+    const keyPoints = [11, 12, 13, 14, 15, 16]; // Shoulders, elbows, wrists
+    for (const i of keyPoints) {
+        if (i >= landmarks.length) continue;
+        const lm = landmarks[i];
+        if (!isValidLandmark(lm)) continue;
+
+        const x = lm[0] * width;
+        const y = lm[1] * height;
+        drawGlowPoint(ctx, x, y, 4, color);
+    }
+}
+
+// Main skeleton drawing function
 export function drawSkeleton(
     ctx: CanvasRenderingContext2D,
     data: {
@@ -96,18 +187,13 @@ export function drawSkeleton(
 ) {
     ctx.clearRect(0, 0, width, height);
 
-    // Draw pose (green)
-    drawConnections(ctx, data.pose, POSE_CONNECTIONS, width, height, { color: '#00ff00', lineWidth: 3 });
-    drawLandmarks(ctx, data.pose, width, height, { color: '#00ff00', pointRadius: 4 });
+    // Draw pose (subtle green)
+    drawPose(ctx, data.pose, width, height);
 
-    // Draw left hand (blue)
-    drawConnections(ctx, data.leftHand, HAND_CONNECTIONS, width, height, { color: '#00ccff', lineWidth: 2 });
-    drawLandmarks(ctx, data.leftHand, width, height, { color: '#00ccff', pointRadius: 3 });
+    // Draw hands (more prominent)
+    drawHand(ctx, data.leftHand, width, height, '#3b82f6'); // Blue
+    drawHand(ctx, data.rightHand, width, height, '#f97316'); // Orange
 
-    // Draw right hand (orange)
-    drawConnections(ctx, data.rightHand, HAND_CONNECTIONS, width, height, { color: '#ff9900', lineWidth: 2 });
-    drawLandmarks(ctx, data.rightHand, width, height, { color: '#ff9900', pointRadius: 3 });
-
-    // Draw face points (pink)
-    drawLandmarks(ctx, data.face, width, height, { color: '#ff66cc', pointRadius: 2 });
+    // Skip face drawing (too cluttered)
+    ctx.globalAlpha = 1;
 }
