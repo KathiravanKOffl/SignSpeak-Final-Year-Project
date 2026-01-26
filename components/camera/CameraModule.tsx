@@ -22,10 +22,11 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
     // Initialize camera
     useEffect(() => {
         let mounted = true;
+        let mediaStream: MediaStream | null = null;
 
         async function initCamera() {
             try {
-                const mediaStream = await navigator.mediaDevices.getUserMedia({
+                mediaStream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         width: { ideal: 1280 },
                         height: { ideal: 720 },
@@ -38,9 +39,17 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
                     videoRef.current.srcObject = mediaStream;
                     setStream(mediaStream);
 
-                    // Wait for video to be ready
-                    videoRef.current.onloadedmetadata = () => {
-                        setCameraReady(true);
+                    // Wait for video to be ready and play it
+                    videoRef.current.onloadedmetadata = async () => {
+                        if (videoRef.current && mounted) {
+                            try {
+                                await videoRef.current.play();
+                                setCameraReady(true);
+                            } catch (playError) {
+                                console.error('Video play error:', playError);
+                                setError('Failed to start video playback');
+                            }
+                        }
                     };
                 }
             } catch (err) {
@@ -55,12 +64,13 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
 
         return () => {
             mounted = false;
-            stream?.getTracks().forEach((track) => track.stop());
+            // Stop tracks from the locally captured mediaStream
+            mediaStream?.getTracks().forEach((track) => track.stop());
             if (animationFrameRef.current) {
                 cancelAnimationFrame(animationFrameRef.current);
             }
         };
-    }, []);
+    }, []); // Empty deps - only run once on mount
 
     // Process frames
     useEffect(() => {
@@ -127,7 +137,7 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
                 <div className="text-center p-8">
                     <div className="text-6xl mb-4 animate-pulse">⏳</div>
                     <p className="text-gray-300 font-semibold text-lg">
-                        {!cameraReady ? 'Initializing camera...' : 'Loading MediaPipe models...'}
+                        {isLoading ? 'Loading MediaPipe models...' : 'Initializing camera...'}
                     </p>
                     <p className="text-sm text-gray-400 mt-2">This may take a few seconds</p>
                     <div className="mt-4 flex justify-center">

@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import torch
 import numpy as np
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 import logging
 from pathlib import Path
 
@@ -52,7 +52,7 @@ class LandmarkRequest(BaseModel):
 
 class PredictionResponse(BaseModel):
     """Response schema for predictions."""
-    predictions: List[Dict[str, any]]  # List of {class: str, confidence: float}
+    predictions: List[Dict[str, Any]]  # List of {class: str, confidence: float}
     gloss: str  # Most likely sign
     confidence: float
     language: str
