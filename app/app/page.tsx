@@ -71,7 +71,16 @@ function AppContent() {
 
         // Throttle predictions to every 500ms
         const now = Date.now();
-        if (now - lastPredictionTime.current >= 500 && landmarks.confidence > 0.3) {
+        const timeSinceLast = now - lastPredictionTime.current;
+
+        // Debug logging every 2 seconds
+        if (timeSinceLast >= 2000) {
+            console.log('[Landmarks] Confidence:', landmarks.confidence.toFixed(2),
+                'Hands:', landmarks.leftHand.some(l => l[0] !== 0) || landmarks.rightHand.some(l => l[0] !== 0));
+        }
+
+        if (timeSinceLast >= 500 && landmarks.confidence > 0.3) {
+            console.log('[Landmarks] Sending prediction...');
             lastPredictionTime.current = now;
             sendPrediction(landmarks);
         }

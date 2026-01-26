@@ -1,7 +1,8 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { useMediaPipe, LandmarksData } from '@/hooks/useMediaPipe';
+import { drawSkeleton } from './SkeletonDrawing';
 
 interface CameraModuleProps {
     onLandmarks?: (landmarks: LandmarksData) => void;
@@ -13,16 +14,29 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const animationFrameRef = useRef<number>();
+    const landmarksRef = useRef<LandmarksData | null>(null);
 
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [cameraStatus, setCameraStatus] = useState<'idle' | 'requesting' | 'granted' | 'playing' | 'ready'>('idle');
+    const [debugInfo, setDebugInfo] = useState({ confidence: 0, hasHands: false });
 
-    const { isLoading: mediaPipeLoading, error: mediaPipeError, processFrame } = useMediaPipe({ onLandmarks });
+    // Handle landmarks - store locally and pass to parent
+    const handleLandmarks = useCallback((landmarks: LandmarksData) => {
+        landmarksRef.current = landmarks;
+        setDebugInfo({
+            confidence: landmarks.confidence,
+            hasHands: landmarks.leftHand.some(lm => lm[0] !== 0) || landmarks.rightHand.some(lm => lm[0] !== 0)
+        });
+        onLandmarks?.(landmarks);
+    }, [onLandmarks]);
 
-    // Camera initialization - runs after component mount when video element exists
+    const { isLoading: mediaPipeLoading, error: mediaPipeError, processFrame } = useMediaPipe({
+        onLandmarks: handleLandmarks
+    });
+
+    // Camera initialization
     useEffect(() => {
-        // Wait for video element to be in DOM
         if (!videoRef.current) {
             console.log('[Camera] Video element not ready, waiting...');
             return;
@@ -55,13 +69,11 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
                 setCameraStatus('granted');
                 setStream(currentStream);
 
-                // Attach stream to video element
                 video.srcObject = currentStream;
                 video.muted = true;
                 video.playsInline = true;
                 console.log('[Camera] Stream attached to video element');
 
-                // Handle video canplay event
                 const handleCanPlay = async () => {
                     console.log('[Camera] Video can play, starting...');
                     try {
@@ -69,7 +81,6 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
                         console.log('[Camera] Video playing!');
                         setCameraStatus('playing');
 
-                        // Check for enough data
                         const checkReady = () => {
                             if (video.readyState >= video.HAVE_ENOUGH_DATA) {
                                 console.log('[Camera] ✅ Video ready with enough data!');
@@ -82,7 +93,6 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
                         checkReady();
                     } catch (err) {
                         console.error('[Camera] Play error:', err);
-                        // Try autoplay with muted
                         video.muted = true;
                         try {
                             await video.play();
@@ -94,10 +104,8 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
                     }
                 };
 
-                // Listen for canplay event
                 video.addEventListener('canplay', handleCanPlay, { once: true });
 
-                // If already can play, trigger manually
                 if (video.readyState >= video.HAVE_FUTURE_DATA) {
                     video.removeEventListener('canplay', handleCanPlay);
                     handleCanPlay();
@@ -121,9 +129,9 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
                 cancelAnimationFrame(animationFrameRef.current);
             }
         };
-    }, []); // Run once on mount
+    }, []);
 
-    // Frame processing - only when camera is ready and MediaPipe is loaded
+    // Frame processing + skeleton drawing
     useEffect(() => {
         if (cameraStatus !== 'ready' || !videoRef.current || mediaPipeLoading) {
             return;
@@ -131,6 +139,7 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
 
         console.log('[Camera] Starting frame processing...');
         const video = videoRef.current;
+        const canvas = canvasRef.current;
         let lastProcessTime = 0;
         const FPS = 30;
         const frameInterval = 1000 / FPS;
@@ -142,14 +151,17 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
             }
 
             if (timestamp - lastProcessTime >= frameInterval) {
+                // Process landmarks
                 processFrame(video, timestamp);
 
-                if (showSkeleton && canvasRef.current) {
-                    const canvas = canvasRef.current;
+                // Draw skeleton on canvas
+                if (showSkeleton && canvas && landmarksRef.current) {
                     const ctx = canvas.getContext('2d');
                     if (ctx && video.videoWidth > 0) {
                         canvas.width = video.videoWidth;
                         canvas.height = video.videoHeight;
+
+                        drawSkeleton(ctx, landmarksRef.current, canvas.width, canvas.height);
                     }
                 }
 
@@ -168,7 +180,6 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
         };
     }, [cameraStatus, mediaPipeLoading, processFrame, showSkeleton]);
 
-    // Determine what message to show
     const getLoadingMessage = () => {
         if (mediaPipeLoading) return 'Loading AI models...';
         switch (cameraStatus) {
@@ -182,7 +193,6 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
 
     const isLoading = cameraStatus !== 'ready' || mediaPipeLoading;
 
-    // Error state
     if (error || mediaPipeError) {
         return (
             <div className={`flex items-center justify-center bg-gray-800 rounded-xl ${className}`}>
@@ -195,10 +205,9 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
         );
     }
 
-    // ALWAYS render video element - hide it during loading
     return (
         <div className={`relative overflow-hidden bg-black rounded-xl ${className}`}>
-            {/* Video element - ALWAYS in DOM, hidden during loading */}
+            {/* Video element - ALWAYS in DOM */}
             <video
                 ref={videoRef}
                 playsInline
@@ -207,7 +216,7 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
                 style={{ transition: 'opacity 0.3s ease' }}
             />
 
-            {/* Canvas overlay for skeleton */}
+            {/* Canvas overlay for skeleton - mirrors the video flip */}
             {showSkeleton && !isLoading && (
                 <canvas
                     ref={canvasRef}
@@ -229,15 +238,16 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
                 </div>
             )}
 
-            {/* Live indicator - only when ready */}
+            {/* Live indicator + debug info */}
             {!isLoading && (
                 <>
                     <div className="absolute top-4 right-4 flex items-center space-x-2 bg-black/50 backdrop-blur px-3 py-1 rounded-lg">
                         <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
                         <span className="text-sm text-white">Live</span>
                     </div>
-                    <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur px-3 py-1 rounded-lg text-xs text-white">
-                        Processing at 30 FPS
+                    <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur px-3 py-1 rounded-lg text-xs text-white space-y-1">
+                        <div>Confidence: {(debugInfo.confidence * 100).toFixed(0)}%</div>
+                        <div>Hands: {debugInfo.hasHands ? '✅ Detected' : '❌ Not detected'}</div>
                     </div>
                 </>
             )}
