@@ -1,41 +1,5 @@
 name = "signspeak"
-compatibility_date = "2024-01-01"
-pages_build_output_dir = ".vercel/output/static"
+compatibility_date = "2024-01-26"
 
-# Cloudflare Pages configuration
-[env.production]
-name = "signspeak-production"
-
-[env.production.vars]
-NODE_ENV = "production"
-
-# Environment variables (set these in Cloudflare Pages dashboard)
-# CLOUDFLARE_ACCOUNT_ID = "your_account_id"
-# CLOUDFLARE_API_TOKEN = "your_api_token"  
-# COLAB_TUNNEL_URL = "https://your-tunnel.trycloudflare.com"
-
-# Development environment
-[env.preview]
-name = "signspeak-preview"
-
-[env.preview.vars]
-NODE_ENV = "development"
-
-# Build configuration
-[[pages_plugins]]
-binding = "ASSETS"
-
-# Durable Objects for room state management (future)
-# [[durable_objects.bindings]]
-# name = "ROOMS"
-# class_name = "SignSpeakRoom"
-# script_name = "signspeak-rooms"
-
-# KV namespace for caching (future)
-# [[kv_namespaces]]
-# binding = "CACHE"
-# id = "your_kv_namespace_id"
-
-# Rate limiting (future)
-# [[analytics_engine_datasets]]
-# binding = "ANALYTICS"
+[build]
+command = "npm install && npm run build"
