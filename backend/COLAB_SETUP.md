@@ -1,261 +1,171 @@
-# Google Colab Backend Setup - Copy & Paste Guide
+# SignSpeak Colab Setup - Complete Guide
 
-Simple guide to deploy SignSpeak backend on Google Colab. Just copy each code block into a new cell and run.
-
----
-
-## 🚀 Quick Start
-
-1. Open https://colab.research.google.com/
-2. Create new notebook
-3. **Runtime** → **Change runtime type** → **T4 GPU** → Save
-4. Copy-paste each cell below in order
-5. Run each cell (Shift+Enter)
+Copy-paste each cell into Google Colab. Run in order.
 
 ---
 
-## 📋 Cells to Create
-
-### Cell 1: Install Dependencies
+## Cell 1: Setup Environment
 
 ```python
+# Install dependencies
 print("📦 Installing dependencies...")
-
 !pip install -q torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 !pip install -q fastapi uvicorn[standard] pydantic python-multipart
-!pip install -q pycloudflared
+!pip install -q pycloudflared gdown
 
-print("✅ Dependencies installed!")
+import torch
+print(f"✅ PyTorch {torch.__version__}")
+print(f"🖥️ GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU only'}")
 ```
 
 ---
 
-### Cell 2: Clone Repository
+## Cell 2: Clone Repository
 
 ```python
 import os
 
-print("📥 Cloning repository...")
+# Clean slate
+if os.path.exists('/content/SignSpeak-Final-Year-Project'):
+    !rm -rf /content/SignSpeak-Final-Year-Project
 
-# Remove if exists
-if os.path.exists('SignSpeak-Final-Year-Project'):
-    !rm -rf SignSpeak-Final-Year-Project
-
+# Clone
 !git clone https://github.com/KathiravanKOffl/SignSpeak-Final-Year-Project.git
-%cd SignSpeak-Final-Year-Project/backend
+%cd /content/SignSpeak-Final-Year-Project/backend
 
-print(f"✅ Repository cloned!")
-print(f"📂 Current directory: {os.getcwd()}")
+print(f"✅ Cloned! Current dir: {os.getcwd()}")
 ```
 
 ---
 
-### Cell 3: Verify GPU
+## Cell 3: Download Pre-Trained WLASL Model
 
 ```python
-import torch
+import os
+import gdown
 
-print("🔍 Checking GPU...\n")
-print(f"🖥️  Device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'}")
-print(f"💾 CUDA: {torch.cuda.is_available()}")
-print(f"🔥 PyTorch: {torch.__version__}")
+print("📥 Downloading WLASL pre-trained model...")
 
-if torch.cuda.is_available():
-    print(f"\n✅ GPU ready!")
-else:
-    print(f"\n⚠️  Using CPU (slower)")
+os.makedirs('/content/wlasl_weights', exist_ok=True)
+
+# Pose-TGCN weights (ASL 100/300/1000/2000)
+gdown.download(
+    'https://drive.google.com/uc?id=1dzvocsaylRsjqaY4r_lyRihPZn0I6AA_', 
+    '/content/wlasl_weights/pose_tgcn.zip',
+    quiet=False
+)
+
+!unzip -o /content/wlasl_weights/pose_tgcn.zip -d /content/wlasl_weights/
+
+print("✅ Model downloaded!")
+print("📂 Available:", os.listdir('/content/wlasl_weights/archived/'))
 ```
 
 ---
 
-### Cell 4: Start Cloudflare Tunnel ⚡ IMPORTANT
+## Cell 4: Create Gloss Mapping
+
+```python
+import json
+
+# Top 100 common ASL signs
+common_glosses = [
+    "HELLO", "THANK-YOU", "YES", "NO", "PLEASE", "SORRY", "HELP", "WATER", "FOOD", "GOOD",
+    "BAD", "NAME", "WHAT", "WHERE", "HOW", "I", "YOU", "MOTHER", "FATHER", "FRIEND",
+    "LOVE", "HAPPY", "SAD", "ANGRY", "HUNGRY", "THIRSTY", "TIRED", "SICK", "PAIN", "DOCTOR",
+    "FAMILY", "HOME", "SCHOOL", "WORK", "MONEY", "TIME", "DAY", "NIGHT", "MORNING", "EVENING",
+    "TODAY", "TOMORROW", "YESTERDAY", "WEEK", "MONTH", "YEAR", "EAT", "DRINK", "SLEEP", "WALK",
+    "RUN", "SIT", "STAND", "GO", "COME", "STOP", "WAIT", "WANT", "NEED", "LIKE",
+    "DONT-LIKE", "KNOW", "DONT-KNOW", "UNDERSTAND", "THINK", "FEEL", "SEE", "HEAR", "SPEAK", "WRITE",
+    "READ", "LEARN", "TEACH", "PLAY", "DANCE", "SING", "COOK", "CLEAN", "BUY", "SELL",
+    "GIVE", "TAKE", "MAKE", "BREAK", "OPEN", "CLOSE", "BIG", "SMALL", "HOT", "COLD",
+    "NEW", "OLD", "FAST", "SLOW", "EASY", "HARD", "RIGHT", "WRONG", "SAME", "DIFFERENT"
+]
+
+gloss_mapping = {
+    "gloss_to_id": {g: i for i, g in enumerate(common_glosses)},
+    "id_to_gloss": {i: g for i, g in enumerate(common_glosses)}
+}
+
+with open('/content/wlasl_weights/gloss_mapping.json', 'w') as f:
+    json.dump(gloss_mapping, f)
+
+print(f"✅ Created mapping for {len(common_glosses)} signs")
+print("Sample:", common_glosses[:10])
+```
+
+---
+
+## Cell 5: Start Cloudflare Tunnel
 
 ```python
 from pycloudflared import try_cloudflare
 import threading
 import time
 
-print("🌐 Starting Cloudflare Tunnel...\n")
+print("🌐 Starting Cloudflare tunnel...")
 
 tunnel_url = None
 
 def start_tunnel():
     global tunnel_url
-    try:
-        url_obj = try_cloudflare(port=8000, verbose=True)
-        tunnel_url = url_obj.tunnel
-        print(f"\n" + "="*70)
-        print(f"✅ TUNNEL ACTIVE!")
-        print(f"\n📋 COPY THIS URL:")
-        print(f"    {tunnel_url}")
-        print(f"\n" + "="*70)
-        print(f"\n🔧 Next Steps:")
-        print(f"   1. Copy the URL above")
-        print(f"   2. Go to Cloudflare Pages dashboard")
-        print(f"   3. Settings → Environment variables")
-        print(f"   4. Edit COLAB_TUNNEL_URL")
-        print(f"   5. Paste this URL and save")
-        print(f"   6. Redeploy your Pages project")
-        print(f"\n" + "="*70)
-    except Exception as e:
-        print(f"❌ Error: {e}")
-
-# Start in background
-tunnel_thread = threading.Thread(target=start_tunnel, daemon=True)
-tunnel_thread.start()
-
-print("⏳ Waiting for tunnel...")
+    result = try_cloudflare(port=8000, verbose=False)
+    tunnel_url = result.tunnel
+    
+threading.Thread(target=start_tunnel, daemon=True).start()
 time.sleep(10)
 
-if tunnel_url:
-    print(f"\n✅ Ready! URL: {tunnel_url}")
-else:
-    print(f"\n⏳ Check output above for URL")
+print("="*60)
+print("🔗 TUNNEL URL (copy this!):")
+print(f"   {tunnel_url}")
+print("="*60)
+print("\n⚠️ Update this URL in Cloudflare Pages environment variables!")
 ```
-
-**⚠️ IMPORTANT**: Copy the tunnel URL that appears! You'll need it for Cloudflare.
 
 ---
 
-### Cell 5: Start FastAPI Server
+## Cell 6: Start Server (Runs Forever)
 
 ```python
-print("🚀 Starting server...")
-print("⚠️  This cell runs forever - that's normal!")
-print("🛑 Press stop button to shut down")
-print("="*70)
+print("🚀 Starting SignSpeak ASL Server...")
+print("⚠️ This cell runs forever - that's normal!")
+print("🛑 Press STOP button to shut down")
+print("="*60)
 
-!python -m uvicorn api.inference_server:app --host 0.0.0.0 --port 8000 --reload
-```
-
-This cell will keep running. You'll see logs like:
-```
-INFO:     Uvicorn running on http://0.0.0.0:8000
-INFO:     Started server process
-INFO:     Application startup complete
+!python -m uvicorn api.inference_server_wlasl:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ---
 
-### Cell 6: Keep-Alive (Optional)
+## Troubleshooting
 
-Run this in a **separate cell** if Colab tends to disconnect:
-
+### "Module not found"
 ```python
-import time
-from IPython.display import clear_output
-
-print("⏰ Keep-alive active...")
-counter = 0
-
-try:
-    while True:
-        counter += 1
-        clear_output(wait=True)
-        print(f"⏰ Uptime: {counter} minutes")
-        print(f"🌐 Tunnel: {tunnel_url if tunnel_url else 'See Cell 4'}")
-        print(f"💚 Status: ACTIVE")
-        print(f"\n💡 Keep this tab open")
-        time.sleep(60)
-except KeyboardInterrupt:
-    print("Stopped")
+%cd /content/SignSpeak-Final-Year-Project/backend
 ```
 
----
-
-## ✅ Verification
-
-After Cell 4 completes, open the tunnel URL in browser:
-```
-https://your-random-id.trycloudflare.com
+### "Port already in use"
+```python
+!kill -9 $(lsof -t -i:8000) 2>/dev/null || true
 ```
 
-You should see JSON response like:
-```json
-{
-  "status": "online",
-  "model_loaded": true,
-  "version": "1.0.0"
-}
-```
+### "Tunnel not working"
+Re-run Cell 5 and update the URL in Cloudflare.
 
 ---
 
-## 🔗 Connect to Frontend
+## Frontend Setup
 
-1. **Copy tunnel URL** from Cell 4 output
-2. Go to **Cloudflare Dashboard**: https://dash.cloudflare.com/
-3. **Workers & Pages** → **your-project** → **Settings**
-4. **Environment variables** → Find `COLAB_TUNNEL_URL`
-5. Click **Edit** → Paste tunnel URL → **Save**
-6. **Deployments** tab → **Retry deployment**
+1. **Cloudflare Dashboard** → Workers & Pages → Your project → Settings
+2. **Environment Variables** → Add/Edit:
+   - `COLAB_TUNNEL_URL` = Your tunnel URL from Cell 5 (no trailing slash!)
+3. **Deployments** → Retry deployment
 
 ---
 
-## 🐛 Troubleshooting
+## Test
 
-### Cell 1 fails
-- Check internet connection
-- Wait 30 seconds and retry
-
-### Cell 2 fails
-- Repository might be private - check GitHub access
-- Or repository moved - update URL
-
-### Cell 4 shows no tunnel URL
-- Wait 30 seconds, tunnel takes time
-- Check Cell 4 output for errors
-- Rerun Cell 4 if needed
-
-### Cell 5 crashes
-- Make sure you're in `backend/` directory (Cell 2)
-- Check if `api/inference_server.py` exists
-- Verify all dependencies installed (Cell 1)
-
-### Colab disconnects
-- Run Cell 6 (keep-alive)
-- Keep browser tab active
-- Upgrade to Colab Pro for longer sessions
-
----
-
-## 📊 Resource Limits
-
-**Free Tier**:
-- 12 hours per session max
-- T4 GPU (16GB VRAM)
-- ~12GB RAM
-- Will disconnect if idle
-
-**When Session Expires**:
-1. Runtime → Restart runtime
-2. Run Cell 1-5 again
-3. Copy new tunnel URL
-4. Update Cloudflare environment variable
-5. Redeploy
-
----
-
-## 💡 Tips
-
-- **Don't close the tab** - Colab disconnects
-- **Run keep-alive** (Cell 6) to prevent idle timeout
-- **Tunnel URL changes** each session - update Cloudflare
-- **Test endpoint**: `your-tunnel-url/health`
-- **Free tier**: 12 hours max, then restart
-
----
-
-## 🎯 Next Steps After Setup
-
-1. ✅ All 5 cells running
-2. ✅ Tunnel URL copied
-3. ✅ Cloudflare env var updated
-4. ✅ Frontend redeployed
-5. ✅ Test: Visit your Pages URL
-6. ✅ Click language → Camera should work
-7. ✅ Sign recognition should send to Colab backend
-
----
-
-**Need Help?** Check full deployment guide in `docs/DEPLOYMENT.md`
+1. Visit: https://teamkathir.pages.dev/app
+2. Allow camera
+3. Make ASL signs
+4. Watch for predictions!
