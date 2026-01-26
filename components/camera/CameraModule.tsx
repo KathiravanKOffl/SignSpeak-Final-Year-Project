@@ -58,13 +58,22 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
                 const playVideo = async () => {
                     try {
                         await video.play();
-                        console.log('[Camera] Video playing, waiting for data...');
+                        console.log('[Camera] Video playing, checking readyState...');
 
-                        // Wait for video to have enough data
+                        // Wait for video to have enough data with timeout
+                        let attempts = 0;
+                        const maxAttempts = 30; // 3 seconds max wait
+
                         const checkVideoReady = () => {
+                            attempts++;
+                            console.log(`[Camera] Ready check ${attempts}: readyState=${video.readyState} (need ${video.HAVE_ENOUGH_DATA})`);
+
                             if (video.readyState >= video.HAVE_ENOUGH_DATA) {
-                                console.log('[Camera] Video ready!');
+                                console.log('[Camera] ✅ Video ready!');
                                 setVideoReady(true);
+                            } else if (attempts >= maxAttempts) {
+                                console.warn('[Camera] ⚠️ Timeout waiting for video data, proceeding anyway...');
+                                setVideoReady(true); // Proceed anyway
                             } else {
                                 setTimeout(checkVideoReady, 100);
                             }
@@ -78,8 +87,10 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
 
                 // Try to play once metadata is loaded
                 if (video.readyState >= video.HAVE_METADATA) {
+                    console.log('[Camera] Metadata already loaded, playing...');
                     playVideo();
                 } else {
+                    console.log('[Camera] Waiting for metadata...');
                     video.addEventListener('loadedmetadata', playVideo, { once: true });
                 }
 
