@@ -1,13 +1,15 @@
 # SignSpeak Deployment Guide
 
-Complete guide to deploy SignSpeak to Cloudflare Pages with zero cost.
+Complete guide to deploy SignSpeak to Cloudflare Pages + Google Colab backend with zero cost.
+
+---
 
 ## 📋 Prerequisites
 
 - GitHub account
 - Cloudflare account (free tier)
-- Google Colab account (for ML backend)
-- Node.js 18+ installed locally (for testing)
+- Google account (for Colab)
+- Node.js 18+ (for local testing only)
 
 ---
 
@@ -23,80 +25,104 @@ git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
 git push -u origin main
 ```
 
-### Step 2: Connect to Cloudflare Pages
+### Step 2: Create Cloudflare Pages Project
 
 1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/)
-2. Click **Workers & Pages** → **Create application** → **Pages** → **Connect to Git**
+2. **Workers & Pages** → **Create application** → **Pages** → **Connect to Git**
 3. Authorize GitHub and select your repository
 4. Click **Begin setup**
 
-### Step 3: Configure Build Settings
+### Step 3: Configure Build Settings ⚠️ CRITICAL
 
-**CRITICAL**: Use these exact settings:
+| Setting | Value |
+|---------|-------|
+| **Project name** | `your-project-name` |
+| **Production branch** | `main` |
+| **Build command** | `npm install && npm run pages:build` |
+| **Build output directory** | `.vercel/output/static` |
+| **Root directory** | `/` |
 
-- **Project name**: `your-project-name` (e.g., `signspeak`, `teamkathir`)
-- **Production branch**: `main`
-- **Build command**: `npm install && npm run pages:build`
-- **Build output directory**: `.vercel/output/static`
-- **Root directory**: `/`
+> **Important**: The `pages:build` script runs `@cloudflare/next-on-pages` adapter which converts Next.js to Cloudflare Pages format.
 
-> **Note**: The `pages:build` script runs `@cloudflare/next-on-pages` adapter which converts Next.js to Cloudflare Pages format.
+### Step 4: Add Compatibility Flag ⚠️ REQUIRED
 
-### Step 4: Add Compatibility Flag
+After first deployment (will fail without this):
 
-1. After first deployment, go to **Settings** → **Functions**
-2. Scroll to **Compatibility flags**
-3. Under **Production compatibility flags**:
-   - Click **Configure Production compatibility flag**
-   - Type: `nodejs_compat`
-   - Click **Save**
-4. Repeat for **Preview compatibility flags** (recommended)
+1. Go to **Settings** → **Functions** (scroll down)
+2. Find **Compatibility flags** section
+3. **Production compatibility flags**: Add `nodejs_compat`
+4. **Preview compatibility flags**: Add `nodejs_compat`
+5. Click **Save**
 
 ### Step 5: Retry Deployment
 
 1. Go to **Deployments** tab
-2. Click on the latest deployment
-3. Click **Retry deployment**
-4. Wait for build to complete (~2-3 minutes)
+2. Click latest (failed) deployment → **Retry deployment**
+3. Wait ~2-3 minutes for build
 
-### Step 6: Verify Deployment
+### Step 6: Verify
 
-Visit your site: `https://your-project-name.pages.dev`
-
-You should see the SignSpeak landing page. ✅
+Visit: `https://your-project-name.pages.dev`
 
 ---
 
 ## 🧪 Part 2: Backend Deployment (Google Colab)
 
-### Step 1: Open Colab Notebook
+### Step 1: Create Colab Notebook
 
-1. Open `backend/colab_deployment.ipynb` in Google Colab
-2. Or create new notebook and copy the code
+1. Go to https://colab.research.google.com/
+2. Create new notebook
+3. **Runtime** → **Change runtime type** → **T4 GPU** → Save
 
-### Step 2: Enable GPU
+### Step 2: Run These Cells
 
-1. Click **Runtime** → **Change runtime type**
-2. Select **T4 GPU**
-3. Click **Save**
-
-### Step 3: Run All Cells
-
-Execute cells in order:
-1. Install dependencies
-2. Load model weights
-3. Start FastAPI server
-4. Create Cloudflare Tunnel
-
-### Step 4: Copy Tunnel URL
-
-After tunnel starts, you'll see output like:
-```
-Your quick Tunnel has been created! Visit it at (it may take some time to be reachable):
-https://abc-xyz-123.trycloudflare.com
+**Cell 1: Install Dependencies**
+```python
+print("📦 Installing dependencies...")
+!pip install -q torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+!pip install -q fastapi uvicorn[standard] pydantic python-multipart
+!pip install -q pycloudflared
+print("✅ Done!")
 ```
 
-Copy this URL. ✅
+**Cell 2: Clone Repository**
+```python
+import os
+if os.path.exists('SignSpeak-Final-Year-Project'):
+    !rm -rf SignSpeak-Final-Year-Project
+!git clone https://github.com/KathiravanKOffl/SignSpeak-Final-Year-Project.git
+%cd SignSpeak-Final-Year-Project/backend
+print(f"✅ Ready! Dir: {os.getcwd()}")
+```
+
+**Cell 3: Verify GPU**
+```python
+import torch
+print(f"GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'}")
+print(f"CUDA: {torch.cuda.is_available()}")
+```
+
+**Cell 4: Start Tunnel** ⚠️ COPY THE URL!
+```python
+from pycloudflared import try_cloudflare
+import threading, time
+
+tunnel_url = None
+def start_tunnel():
+    global tunnel_url
+    url_obj = try_cloudflare(port=8000, verbose=True)
+    tunnel_url = url_obj.tunnel
+    print(f"\n{'='*60}\n✅ TUNNEL URL:\n    {tunnel_url}\n{'='*60}")
+
+threading.Thread(target=start_tunnel, daemon=True).start()
+time.sleep(10)
+print(f"URL: {tunnel_url}" if tunnel_url else "Starting...")
+```
+
+**Cell 5: Start Server**
+```python
+!python -m uvicorn api.inference_server:app --host 0.0.0.0 --port 8000 --reload
+```
 
 ---
 
@@ -104,170 +130,118 @@ Copy this URL. ✅
 
 ### Step 1: Add Environment Variables
 
-1. Go to Cloudflare Dashboard → Your Pages project
-2. **Settings** → **Environment variables**
-3. Add the following:
+In Cloudflare Dashboard → Your project → **Settings** → **Environment variables**:
 
-**Production variables**:
-```
-COLAB_TUNNEL_URL = https://your-tunnel-url.trycloudflare.com
-CLOUDFLARE_ACCOUNT_ID = your-cloudflare-account-id
-CLOUDFLARE_API_TOKEN = your-api-token
-```
+| Variable | Value |
+|----------|-------|
+| `COLAB_TUNNEL_URL` | `https://your-tunnel.trycloudflare.com` |
+| `CLOUDFLARE_ACCOUNT_ID` | Your account ID (from dashboard URL) |
+| `CLOUDFLARE_API_TOKEN` | Create at Profile → API Tokens |
 
-**Preview variables**: (Same values)
+### Step 2: Redeploy
 
-### Step 2: Get Cloudflare Credentials
-
-**Account ID**:
-- Found in Cloudflare Dashboard → Workers & Pages → (Your project) → Settings, under "Account ID"
-
-**API Token**:
-1. Go to Cloudflare Dashboard → **My Profile** → **API Tokens**
-2. Click **Create Token**
-3. Use template: **Edit Cloudflare Workers**
-4. Or create custom with: `Account.Workers AI:Read`
-5. Copy the token immediately (shown only once)
-
-### Step 3: Redeploy
-
-1. Go to **Deployments** tab
-2. Click **Retry deployment** on latest
-3. Or push a new commit to trigger auto-deploy
+**Deployments** → Click latest → **Retry deployment**
 
 ---
 
-## 🎯 Part 4: Verification & Testing
+## ✅ Part 4: Verification
 
 ### Test Checklist
 
-- [ ] Landing page loads at `https://your-project.pages.dev`
-- [ ] Click ISL or ASL button
-- [ ] Camera permission dialog appears
-- [ ] Camera turns on and stays on
-- [ ] MediaPipe models load (see console: "Graph successfully started running")
-- [ ] Camera feed appears with "Live" indicator
-- [ ] No console errors
+- [ ] Landing page loads at your Pages URL
+- [ ] Click ISL or ASL → Camera permission requested
+- [ ] Camera light ON and video feed visible
+- [ ] Console shows: `[Camera] ✅ Video ready with enough data!`
+- [ ] Console shows: `Graph successfully started running.` (MediaPipe)
+- [ ] Backend accessible at tunnel URL → Shows JSON status
 
-### Common Issues
+### Console Logs (Expected)
 
-**404 Error**:
-- Check build output directory is `.vercel/output/static`
-- Verify build command is `npm run pages:build`
+```
+[Camera] Requesting camera access...
+[Camera] Camera access granted
+[Camera] Stream attached to video element
+[Camera] Video can play, starting...
+[Camera] Video playing!
+[Camera] ✅ Video ready with enough data!
+[Camera] Starting frame processing...
+```
 
-**Node.js Compatibility Error**:
+---
+
+## 🐛 Troubleshooting
+
+### Build Fails with "edge runtime" error
+- Ensure all API routes have: `export const runtime = 'edge';`
+- Located in: `app/api/*/route.ts`
+
+### "Node.JS Compatibility Error" on site
 - Add `nodejs_compat` flag in Settings → Functions → Compatibility flags
 
-**Camera turns off after 3 seconds**:
-- This is a known bug, fix pending
-- See `camera_analysis.md` for details
+### 404 Error
+- Check output directory is `.vercel/output/static`
+- Verify build command is `npm run pages:build`
 
-**MediaPipe models don't load**:
-- Check browser console for errors
-- Verify WASM files are being served correctly
-- Try hard refresh (Ctrl+F5)
+### Camera stuck on "Starting video..."
+- This was a bug (video element not in DOM during loading)
+- Fixed in commit `21f70dd` - ensure you have latest code
 
----
+### Backend 502 Bad Gateway
+- Check Colab notebook is still running
+- Verify Cell 5 (server) is active
+- Check tunnel URL is correct in env vars
 
-## 📊 Cost Breakdown
-
-| Service | Free Tier | Estimated Usage | Cost |
-|---------|-----------|-----------------|------|
-| Cloudflare Pages | 500 builds/month | ~10-20/month | **$0** |
-| Cloudflare Workers AI | 10,000 requests/day | ~100/day | **$0** |
-| Google Colab | T4 GPU 12 hrs/session | As needed | **$0** |
-| GitHub | Unlimited repos | 1 repo | **$0** |
-| **TOTAL** | | | **$0/month** |
+### Colab Session Expires
+- Free tier: 12 hours max
+- Re-run all cells, copy new tunnel URL
+- Update Cloudflare env var, redeploy
 
 ---
 
-## 🔄 Updating the Application
+## 💰 Cost Breakdown
 
-### Frontend Updates
+| Service | Free Tier | Cost |
+|---------|-----------|------|
+| Cloudflare Pages | 500 builds/month | $0 |
+| Cloudflare Workers AI | 10,000 req/day | $0 |
+| Google Colab | T4 GPU, 12hr sessions | $0 |
+| **TOTAL** | | **$0/month** |
 
+---
+
+## 🔄 Updating
+
+### Frontend Changes
 ```bash
-# Make your changes
 git add .
 git commit -m "Your changes"
 git push origin main
+# Auto-deploys to Cloudflare Pages
 ```
 
-Cloudflare Pages auto-deploys on every push to `main`. ✅
-
-### Backend Updates
-
-1. Update `backend/` code locally
-2. Commit and push to GitHub
-3. Re-run Colab notebook cells
-4. Update `COLAB_TUNNEL_URL` if tunnel URL changed
-
----
-
-## 🛠️ Troubleshooting
-
-### Build Fails
-
-1. **Check build logs** in Cloudflare Dashboard → Deployments → (Failed build) → View logs
-2. Common fixes:
-   - Ensure all dependencies are in `dependencies`, not `devDependencies`
-   - Verify `@cloudflare/next-on-pages` is installed
-   - Check Next.js version compatibility
-
-### Runtime Errors
-
-1. **Open browser console** (F12)
-2. Check for:
-   - CORS errors → Backend not responding
-   - 404s → Missing static files
-   - TypeError → JS bundle issue
-
-### Colab Session Expires
-
-Google Colab free tier sessions expire after 12 hours of inactivity.
-
-**Solution**:
-1. Re-run all cells in notebook
-2. Copy new tunnel URL
-3. Update `COLAB_TUNNEL_URL` in Cloudflare
-4. Retry deployment
-
----
-
-## 📚 Additional Resources
-
-- [Cloudflare Pages Docs](https://developers.cloudflare.com/pages/)
-- [@cloudflare/next-on-pages](https://github.com/cloudflare/next-on-pages)
-- [Next.js Edge Runtime](https://nextjs.org/docs/app/building-your-application/rendering/edge-and-nodejs-runtimes)
-- [MediaPipe Tasks Vision](https://developers.google.com/mediapipe/solutions/vision/pose_landmarker)
-
----
-
-## 🎓 Project Structure
-
-```
-SignSpeak/
-├── app/                    # Next.js App Router
-│   ├── api/               # Edge API routes
-│   └── (pages)/           # UI pages
-├── components/            # React components
-├── hooks/                 # Custom hooks (MediaPipe)
-├── backend/               # Python ML backend
-│   └── colab_deployment.ipynb
-└── docs/                  # Documentation (you are here!)
+### Backend Changes
+```bash
+git push origin main
+# In Colab: %cd /content && !rm -rf SignSpeak* && <run Cell 2 again>
 ```
 
 ---
 
-## ✅ Success Criteria
+## 📚 Project URLs
 
-Your deployment is successful when:
-
-1. ✅ Site loads at Cloudflare Pages URL
-2. ✅ No build or runtime errors
-3. ✅ Camera initializes and captures video
-4. ✅ MediaPipe models load in browser
-5. ✅ Backend API is accessible (when Colab running)
+- **Frontend**: `https://teamkathir.pages.dev`
+- **Backend Health**: `https://[tunnel-url]/health`
+- **API Predict**: `POST https://[tunnel-url]/predict`
 
 ---
 
-**Questions or issues?** Check `CLOUDFLARE_ARCHITECTURE.md` for system architecture details.
+## 🎓 Current Status
+
+| Feature | Status |
+|---------|--------|
+| Camera capture | ✅ Working |
+| MediaPipe detection | ✅ Working (no skeleton viz yet) |
+| Backend server | ✅ Running |
+| Tunnel connection | ✅ Connected |
+| ML Model | ⏳ Using random weights (needs training) |
+| Sign recognition | ⏳ Will work after model training |
