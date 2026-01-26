@@ -34,6 +34,6 @@
     "eslint": "^9.18.0",
     "eslint-config-next": "15.1.4",
     "wrangler": "^3.94.0",
-    "vercel": "^37.19.0"
+    "vercel": "35.0.0"
   }
 }
