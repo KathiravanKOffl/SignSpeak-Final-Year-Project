@@ -23,6 +23,12 @@ const nextConfig = {
 
     return config;
   },
+
+  // Important: Output must be compatible with Cloudflare Pages
+  // @cloudflare/next-on-pages will convert this
+  images: {
+    unoptimized: true, // Cloudflare Images optimization will handle this
+  },
 };
 
 export default nextConfig;

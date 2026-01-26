@@ -5,6 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "pages:build": "npx @cloudflare/next-on-pages",
+    "preview": "npm run pages:build && wrangler pages dev",
+    "deploy": "npm run pages:build && wrangler pages deploy",
     "start": "next start",
     "lint": "next lint"
   },
@@ -27,7 +30,10 @@
     "@types/three": "^0.171.0"
   },
   "devDependencies": {
+    "@cloudflare/next-on-pages": "^1.13.6",
     "eslint": "^8.57.0",
-    "eslint-config-next": "14.2.18"
+    "eslint-config-next": "14.2.18",
+    "wrangler": "^3.94.0",
+    "vercel": "^37.19.0"
   }
 }
