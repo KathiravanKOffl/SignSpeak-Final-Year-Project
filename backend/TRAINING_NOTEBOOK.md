@@ -1,35 +1,46 @@
-# SignSpeak Model Training - MediaPipe Landmarks
+# SignSpeak Model Training - Complete Guide
 
-Training ASL Alphabet (A-Z) recognition using MediaPipe landmarks.
+Train ASL word-level sign recognition on MediaPipe landmarks.
 
 ---
 
-## Cell 1: Install Dependencies
+## Cell 1: Upload Kaggle Token & Install
 
 ```python
+# Upload kaggle.json (drag and drop when prompted)
+from google.colab import files
+print("📤 Upload your kaggle.json file...")
+uploaded = files.upload()
+
+# Setup Kaggle
+!mkdir -p ~/.kaggle
+!mv kaggle.json ~/.kaggle/
+!chmod 600 ~/.kaggle/kaggle.json
+
+# Install dependencies
 !pip install -q kagglehub torch numpy pandas scikit-learn tqdm
 
 import torch
-print(f"✅ PyTorch {torch.__version__}")
-print(f"🖥️ GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU only'}")
+print(f"✅ Setup complete! GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'}")
 ```
 
 ---
 
-## Cell 2: Download Dataset (kagglehub)
+## Cell 2: Download Dataset
 
 ```python
 import kagglehub
+import os
 
-# Download MediaPipe-processed ASL dataset
-path = kagglehub.dataset_download("risangbaskoro/asl-words-wlasl-mediapipe-features")
+# Download WLASL MediaPipe features (word-level signs)
+print("📥 Downloading dataset...")
+path = kagglehub.dataset_download("risangbaskoro/wlasl-mediapipe-features")
 print(f"✅ Downloaded to: {path}")
 
-# List contents
-import os
-for root, dirs, files in os.walk(path):
-    for f in files[:10]:
-        print(os.path.join(root, f))
+# Show contents
+for root, dirs, files_list in os.walk(path):
+    for f in files_list[:10]:
+        print(f"  {os.path.join(root, f)}")
 ```
 
 ---
@@ -37,140 +48,123 @@ for root, dirs, files in os.walk(path):
 ## Cell 3: Load Data
 
 ```python
-import numpy as np
 import pandas as pd
+import numpy as np
 import os
 
-# Find parquet/csv files
-data_path = path
-files = []
-for root, dirs, fs in os.walk(data_path):
-    for f in fs:
-        if f.endswith('.parquet') or f.endswith('.csv') or f.endswith('.npy'):
-            files.append(os.path.join(root, f))
+# Find parquet files
+data_files = []
+for root, dirs, files_list in os.walk(path):
+    for f in files_list:
+        if f.endswith('.parquet'):
+            data_files.append(os.path.join(root, f))
             
-print(f"Found files: {files[:5]}")
+print(f"Found {len(data_files)} parquet files")
 
-# Load based on file type
-if files[0].endswith('.parquet'):
-    df = pd.read_parquet(files[0])
-elif files[0].endswith('.csv'):
-    df = pd.read_csv(files[0])
-    
-print(f"Shape: {df.shape}")
-print(f"Columns: {list(df.columns)[:10]}")
+# Load all data
+dfs = []
+for f in data_files[:50]:  # Limit for faster training
+    try:
+        df = pd.read_parquet(f)
+        dfs.append(df)
+    except Exception as e:
+        print(f"Skipping {f}: {e}")
+
+data = pd.concat(dfs, ignore_index=True)
+print(f"✅ Loaded {len(data)} samples")
+print(f"Columns: {list(data.columns)[:10]}")
 ```
 
 ---
 
-## Cell 4: Prepare Data
+## Cell 4: Prepare Features
 
 ```python
-# Adjust these based on actual dataset structure
-# Common formats:
-# - 'landmark_0_x', 'landmark_0_y', 'landmark_0_z', ... (flattened)
-# - Separate columns for each landmark coordinate
-
-# Get feature columns (exclude label column)
-label_col = 'label' if 'label' in df.columns else 'sign' if 'sign' in df.columns else df.columns[-1]
-feature_cols = [c for c in df.columns if c != label_col]
+# Find label and feature columns
+if 'label' in data.columns:
+    label_col = 'label'
+elif 'sign' in data.columns:
+    label_col = 'sign'
+else:
+    label_col = data.columns[-1]
+    
+feature_cols = [c for c in data.columns if c != label_col and data[c].dtype in ['float64', 'float32', 'int64']]
 
 print(f"Label column: {label_col}")
-print(f"Feature columns: {len(feature_cols)}")
-print(f"Unique labels: {df[label_col].nunique()}")
+print(f"Features: {len(feature_cols)}")
 
-# Prepare X and y
-X = df[feature_cols].values.astype(np.float32)
-y_labels = df[label_col].values
+# Remove NaN rows
+data = data.dropna(subset=[label_col])
 
-# Create label mapping
+# Get top N most common classes (for faster training)
+N_CLASSES = 50
+top_classes = data[label_col].value_counts().head(N_CLASSES).index.tolist()
+data = data[data[label_col].isin(top_classes)]
+
+print(f"Using top {N_CLASSES} classes: {top_classes[:10]}...")
+
+# Prepare X, y
+X = data[feature_cols].fillna(0).values.astype(np.float32)
+y_labels = data[label_col].values
+
+# Create mappings
 unique_labels = sorted(set(y_labels))
 label_to_id = {label: i for i, label in enumerate(unique_labels)}
 id_to_label = {i: label for label, i in label_to_id.items()}
+y = np.array([label_to_id[l] for l in y_labels])
 
-y = np.array([label_to_id[label] for label in y_labels])
-
-print(f"X shape: {X.shape}")
-print(f"y shape: {y.shape}")
+print(f"X shape: {X.shape}, y shape: {y.shape}")
 print(f"Classes: {len(unique_labels)}")
-print(f"Sample labels: {unique_labels[:10]}")
 
 # Save mapping
 import json
 with open('/content/label_mapping.json', 'w') as f:
-    json.dump({'label_to_id': label_to_id, 'id_to_label': {str(k): v for k, v in id_to_label.items()}}, f)
-print("✅ Label mapping saved!")
+    json.dump({'id_to_label': {str(k): v for k, v in id_to_label.items()}}, f)
+print("✅ Saved label_mapping.json")
 ```
 
 ---
 
-## Cell 5: Create Dataset and Model
+## Cell 5: Create Model
 
 ```python
+import torch
+import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
-import torch.nn as nn
 
 class ASLDataset(Dataset):
     def __init__(self, X, y):
-        # Handle NaN values
-        X = np.nan_to_num(X, 0)
-        self.X = torch.FloatTensor(X)
+        self.X = torch.FloatTensor(np.nan_to_num(X, 0))
         self.y = torch.LongTensor(y)
-        
-    def __len__(self):
-        return len(self.X)
-    
-    def __getitem__(self, idx):
-        return self.X[idx], self.y[idx]
+    def __len__(self): return len(self.X)
+    def __getitem__(self, i): return self.X[i], self.y[i]
 
-class ASLClassifier(nn.Module):
-    def __init__(self, input_dim, num_classes, hidden_dim=512):
+class ASLModel(nn.Module):
+    def __init__(self, input_dim, num_classes):
         super().__init__()
-        
         self.net = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.BatchNorm1d(hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(0.3),
-            
-            nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.BatchNorm1d(hidden_dim // 2),
-            nn.ReLU(),
-            nn.Dropout(0.3),
-            
-            nn.Linear(hidden_dim // 2, hidden_dim // 4),
-            nn.BatchNorm1d(hidden_dim // 4),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            
-            nn.Linear(hidden_dim // 4, num_classes)
+            nn.Linear(input_dim, 512), nn.BatchNorm1d(512), nn.ReLU(), nn.Dropout(0.3),
+            nn.Linear(512, 256), nn.BatchNorm1d(256), nn.ReLU(), nn.Dropout(0.3),
+            nn.Linear(256, 128), nn.BatchNorm1d(128), nn.ReLU(), nn.Dropout(0.2),
+            nn.Linear(128, num_classes)
         )
-        
     def forward(self, x):
-        if len(x.shape) == 3:
-            x = x.mean(dim=1)
+        if len(x.shape) == 3: x = x.mean(1)
         return self.net(x)
 
-# Split data
-X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+# Split
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
+train_loader = DataLoader(ASLDataset(X_train, y_train), batch_size=64, shuffle=True)
+val_loader = DataLoader(ASLDataset(X_val, y_val), batch_size=64)
 
-train_dataset = ASLDataset(X_train, y_train)
-val_dataset = ASLDataset(X_val, y_val)
-train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=64)
-
-# Create model
-input_dim = X.shape[1]
-num_classes = len(unique_labels)
-model = ASLClassifier(input_dim=input_dim, num_classes=num_classes)
-
-print(f"✅ Model ready: input_dim={input_dim}, num_classes={num_classes}")
+model = ASLModel(X.shape[1], len(unique_labels))
+print(f"✅ Model: {X.shape[1]} features → {len(unique_labels)} classes")
 ```
 
 ---
 
-## Cell 6: Train Model
+## Cell 6: Train (30-60 min)
 
 ```python
 import torch.optim as optim
@@ -178,55 +172,38 @@ from tqdm import tqdm
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 model = model.to(device)
+optimizer = optim.AdamW(model.parameters(), lr=1e-3)
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=50)
 
 best_acc = 0
-EPOCHS = 50
-
-for epoch in range(EPOCHS):
-    # Train
+for epoch in range(50):
     model.train()
-    total_loss = 0
-    for X_batch, y_batch in tqdm(train_loader, desc=f'Epoch {epoch+1}/{EPOCHS}', leave=False):
-        X_batch, y_batch = X_batch.to(device), y_batch.to(device)
-        
+    for X_b, y_b in train_loader:
+        X_b, y_b = X_b.to(device), y_b.to(device)
         optimizer.zero_grad()
-        outputs = model(X_batch)
-        loss = criterion(outputs, y_batch)
+        loss = criterion(model(X_b), y_b)
         loss.backward()
         optimizer.step()
-        total_loss += loss.item()
     
-    # Validate
     model.eval()
     correct = total = 0
     with torch.no_grad():
-        for X_batch, y_batch in val_loader:
-            X_batch, y_batch = X_batch.to(device), y_batch.to(device)
-            outputs = model(X_batch)
-            _, predicted = outputs.max(1)
-            total += y_batch.size(0)
-            correct += predicted.eq(y_batch).sum().item()
+        for X_b, y_b in val_loader:
+            X_b, y_b = X_b.to(device), y_b.to(device)
+            correct += (model(X_b).argmax(1) == y_b).sum().item()
+            total += len(y_b)
     
     acc = 100 * correct / total
-    print(f'Epoch {epoch+1}: Loss={total_loss/len(train_loader):.4f}, Val Acc={acc:.2f}%')
+    print(f'Epoch {epoch+1}: {acc:.1f}%')
     
     if acc > best_acc:
         best_acc = acc
-        torch.save({
-            'model_state_dict': model.state_dict(),
-            'input_dim': input_dim,
-            'num_classes': num_classes,
-            'accuracy': acc,
-            'id_to_label': id_to_label,
-        }, '/content/best_asl_model.pth')
-        print(f'  ✅ Best model saved! ({acc:.2f}%)')
-    
-    scheduler.step()
+        torch.save({'model': model.state_dict(), 'input_dim': X.shape[1], 
+                    'num_classes': len(unique_labels), 'id_to_label': id_to_label}, 
+                   '/content/best_model.pth')
+        print(f'  ✅ Saved! Best: {acc:.1f}%')
 
-print(f'\n🎉 Training complete! Best accuracy: {best_acc:.2f}%')
+print(f'\n🎉 Done! Best accuracy: {best_acc:.1f}%')
 ```
 
 ---
@@ -234,42 +211,24 @@ print(f'\n🎉 Training complete! Best accuracy: {best_acc:.2f}%')
 ## Cell 7: Copy to Backend
 
 ```python
-import shutil
-import os
+import shutil, os
 
-# Clone/update repo
-if not os.path.exists('/content/SignSpeak-Final-Year-Project'):
-    !git clone https://github.com/KathiravanKOffl/SignSpeak-Final-Year-Project.git
-else:
-    %cd /content/SignSpeak-Final-Year-Project
-    !git pull
+# Update repo
+!cd /content && rm -rf SignSpeak* && git clone https://github.com/KathiravanKOffl/SignSpeak-Final-Year-Project.git
 
-# Copy model and mapping
+# Copy model
 dest = '/content/SignSpeak-Final-Year-Project/backend/checkpoints/'
 os.makedirs(dest, exist_ok=True)
-shutil.copy('/content/best_asl_model.pth', dest)
+shutil.copy('/content/best_model.pth', dest)
 shutil.copy('/content/label_mapping.json', dest)
-
-print(f"✅ Model copied to {dest}")
-print("📂 Files:", os.listdir(dest))
+print(f"✅ Copied to {dest}")
 ```
 
 ---
 
-## Cell 8: Test Locally
+## Cell 8: Restart Server
 
 ```python
-# Quick test
-checkpoint = torch.load('/content/best_asl_model.pth')
-print(f"Model accuracy: {checkpoint['accuracy']:.2f}%")
-print(f"Classes: {checkpoint['num_classes']}")
-print(f"Sample labels: {list(checkpoint['id_to_label'].values())[:10]}")
+%cd /content/SignSpeak-Final-Year-Project/backend
+!python -m uvicorn api.inference_server_wlasl:app --host 0.0.0.0 --port 8000 --reload
 ```
-
----
-
-## After Training:
-
-1. Update `inference_server_wlasl.py` to load `/checkpoints/best_asl_model.pth`
-2. Restart server
-3. Test with camera!
