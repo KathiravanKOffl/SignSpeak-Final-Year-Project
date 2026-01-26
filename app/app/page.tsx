@@ -121,7 +121,7 @@ function AppContent() {
                         </div>
                         <CameraModule
                             onLandmarks={handleLandmarks}
-                            showSkeleton={true}
+                            showSkeleton={false}
                             className="w-full h-full"
                         />
                     </div>

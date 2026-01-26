@@ -39,15 +39,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Flatten landmarks for backend
-        const flattenedLandmarks = [
-            ...body.landmarks.pose.flat(),
-            ...body.landmarks.leftHand.flat(),
-            ...body.landmarks.rightHand.flat(),
-            ...body.landmarks.face.flat(),
-        ];
-
-        // Call backend inference API
+        // Call backend inference API - send full landmarks object
         const baseUrl = COLAB_TUNNEL_URL.replace(/\/+$/, ''); // Remove trailing slashes
         const response = await fetch(`${baseUrl}/predict`, {
             method: 'POST',
@@ -55,8 +47,8 @@ export async function POST(request: NextRequest) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                landmarks: flattenedLandmarks,
-                language: body.language || 'isl',
+                landmarks: body.landmarks,  // Send full object, not flattened
+                language: body.language || 'asl',
                 top_k: body.top_k || 5,
             }),
         });
