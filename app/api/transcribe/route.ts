@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const runtime = 'edge';
+
 interface TranscribeRequest {
     audio: string; // Base64 encoded audio
     language?: string; // Target language for transcription
@@ -27,8 +29,13 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Decode base64 audio
-        const audioBuffer = Buffer.from(body.audio, 'base64');
+        // Decode base64 audio using Web APIs
+        const binaryString = atob(body.audio);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        const audioBuffer = bytes;
 
         // Call Cloudflare Workers AI Whisper model
         const response = await fetch(

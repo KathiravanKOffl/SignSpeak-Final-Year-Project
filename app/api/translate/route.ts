@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const runtime = 'edge';
+
 interface TranslateRequest {
     text: string;
     source_language: string; // 'en', 'hi', 'ta'

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
+
+export const runtime = 'edge';
 
 interface CreateRoomRequest {
     language?: 'isl' | 'asl';
@@ -17,8 +18,10 @@ export async function POST(request: NextRequest) {
     try {
         const body: CreateRoomRequest = await request.json();
 
-        // Generate unique room ID
-        const roomId = crypto.randomBytes(6).toString('hex'); // e.g., 'a3f9c2e1b4d7'
+        // Generate unique room ID using Web Crypto API
+        const array = new Uint8Array(6);
+        crypto.getRandomValues(array);
+        const roomId = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
 
         // Create room
         const room = {
