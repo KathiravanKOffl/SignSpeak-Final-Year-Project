@@ -36,14 +36,13 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
                 });
 
                 if (mounted && videoRef.current) {
-                    videoRef.current.srcObject = mediaStream;
-                    setStream(mediaStream);
+                    const video = videoRef.current;
 
-                    // Wait for video to be ready and play it
-                    videoRef.current.onloadedmetadata = async () => {
-                        if (videoRef.current && mounted) {
+                    // Attach metadata handler BEFORE setting srcObject to avoid race condition
+                    const handleLoadedMetadata = async () => {
+                        if (video && mounted) {
                             try {
-                                await videoRef.current.play();
+                                await video.play();
                                 setCameraReady(true);
                             } catch (playError) {
                                 console.error('Video play error:', playError);
@@ -51,6 +50,15 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
                             }
                         }
                     };
+
+                    video.onloadedmetadata = handleLoadedMetadata;
+                    video.srcObject = mediaStream;
+                    setStream(mediaStream);
+
+                    // If metadata already loaded, call handler immediately
+                    if (video.readyState >= video.HAVE_METADATA) {
+                        handleLoadedMetadata();
+                    }
                 }
             } catch (err) {
                 console.error('Camera access error:', err);
