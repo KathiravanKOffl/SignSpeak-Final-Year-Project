@@ -48,7 +48,8 @@ export async function POST(request: NextRequest) {
         ];
 
         // Call backend inference API
-        const response = await fetch(`${COLAB_TUNNEL_URL}/predict`, {
+        const baseUrl = COLAB_TUNNEL_URL.replace(/\/+$/, ''); // Remove trailing slashes
+        const response = await fetch(`${baseUrl}/predict`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -92,7 +93,8 @@ export async function GET() {
     }
 
     try {
-        const response = await fetch(`${COLAB_TUNNEL_URL}/health`, {
+        const baseUrl = COLAB_TUNNEL_URL.replace(/\/+$/, '');
+        const response = await fetch(`${baseUrl}/health`, {
             method: 'GET',
         });
 
