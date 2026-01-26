@@ -1,0 +1,10 @@
+# Cloudflare Pages - Ignore Python files during build
+# Only build the Next.js frontend
+
+/backend/
+/python-utils/
+requirements.txt
+*.py
+*.ipynb
+__pycache__/
+*.pyc
