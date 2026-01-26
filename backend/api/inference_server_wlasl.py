@@ -93,11 +93,55 @@ async def load_model():
     logger.info(f"Loading WLASL model on device: {device}")
     
     try:
-        # Check for WLASL weights
-        wlasl_path = Path("/content/wlasl_weights/archived/asl100/ckpt.pth")
-        gloss_path = Path("/content/wlasl_weights/gloss_mapping.json")
+    try:
+        # Check for trained model first (best_model.pth)
+        trained_path = Path("./checkpoints/best_model.pth")
+        trained_mapping_path = Path("./checkpoints/label_mapping.json")
         
-        if wlasl_path.exists():
+        # Fallback to pre-trained weights (ckpt.pth)
+        wlasl_path = Path("/content/wlasl_weights/archived/asl100/ckpt.pth")
+        
+        if trained_path.exists():
+            logger.info(f"Found trained model at {trained_path}")
+            checkpoint = torch.load(trained_path, map_location=device)
+            
+            # Extract info from checkpoint
+            if 'num_classes' in checkpoint:
+                num_classes = checkpoint['num_classes']
+                input_dim = checkpoint.get('input_dim', 225) # Default to 225 if missing
+            else:
+                num_classes = 100 # Default fallback
+                input_dim = 225
+                
+            # Create model
+            wlasl_model = load_simple_classifier(input_dim=input_dim, num_classes=num_classes)
+            
+            # Load weights
+            if 'model_state_dict' in checkpoint:
+                wlasl_model.load_state_dict(checkpoint['model_state_dict'])
+            elif 'model' in checkpoint:
+                wlasl_model.load_state_dict(checkpoint['model'])
+                
+            # Load gloss mapping from checkpoint or file
+            if 'id_to_label' in checkpoint:
+                gloss_mapping = {int(k): v.upper() for k, v in checkpoint['id_to_label'].items()}
+                logger.info("Loaded mapping from checkpoint")
+            elif trained_mapping_path.exists():
+                with open(trained_mapping_path, 'r') as f:
+                    data = json.load(f)
+                    # Check format (could be id_to_label inside or direct)
+                    if 'id_to_label' in data:
+                        gloss_mapping = {int(k): v.upper() for k, v in data['id_to_label'].items()}
+                    else:
+                        gloss_mapping = {int(k): v.upper() for k, v in data.items()}
+                logger.info("Loaded mapping from json file")
+            
+            wlasl_model.to(device)
+            wlasl_model.eval()
+            logger.info(f"✅ Trained model loaded! Classes: {len(gloss_mapping)}")
+            return
+
+        elif wlasl_path.exists():
             logger.info("Found WLASL pre-trained weights!")
             checkpoint = torch.load(wlasl_path, map_location=device)
             
@@ -117,19 +161,25 @@ async def load_model():
                 
             wlasl_model.to(device)
             wlasl_model.eval()
+            
+            # Load default WLASL mapping
+            gloss_path = Path("/content/wlasl_weights/gloss_mapping.json")
+            if gloss_path.exists():
+                with open(gloss_path, 'r') as f:
+                    data = json.load(f)
+                    gloss_mapping = {int(k): v for k, v in data.get('id_to_gloss', {}).items()}
+            else:
+                 # Default 100 classes
+                 pass # Use the hardcoded list below
+                 
         else:
-            logger.warning("WLASL weights not found, using random model")
+            logger.warning("No model found, using random initialized model")
             wlasl_model = load_simple_classifier(num_classes=100)
             wlasl_model.to(device)
             wlasl_model.eval()
         
-        # Load gloss mapping
-        if gloss_path.exists():
-            with open(gloss_path, 'r') as f:
-                data = json.load(f)
-                gloss_mapping = {int(k): v for k, v in data.get('id_to_gloss', {}).items()}
-            logger.info(f"Loaded {len(gloss_mapping)} gloss mappings")
-        else:
+        # If mapping empty, load default
+        if not gloss_mapping:
             # Default ASL glosses (top 100 common signs)
             common_glosses = [
                 "hello", "thank-you", "yes", "no", "please", "sorry", "help", "water", "food", "good",
