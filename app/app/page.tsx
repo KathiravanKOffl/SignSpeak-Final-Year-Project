@@ -50,15 +50,21 @@ function AppContent() {
             const result = await response.json();
             console.log('[Predict] Result:', result);
 
-            if (result.gloss && result.confidence > 0.5) {
-                setPredictionStatus(`${result.gloss} (${(result.confidence * 100).toFixed(0)}%)`);
-                addTranscriptMessage({
-                    id: Date.now().toString(),
-                    text: result.gloss,
-                    type: 'sign',
-                    timestamp: new Date(),
-                    confidence: result.confidence,
-                });
+            // Always show predictions (even low confidence for demo)
+            if (result.gloss) {
+                const conf = result.confidence || 0;
+                setPredictionStatus(`${result.gloss} (${(conf * 100).toFixed(0)}%)`);
+
+                // Add to transcript (lower threshold for demo)
+                if (conf > 0.01) {
+                    addTranscriptMessage({
+                        id: Date.now().toString(),
+                        text: result.gloss,
+                        type: 'sign',
+                        timestamp: new Date(),
+                        confidence: conf,
+                    });
+                }
             }
         } catch (err) {
             console.error('[Predict] Network error:', err);
