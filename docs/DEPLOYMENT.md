@@ -238,21 +238,18 @@ Your code is already on GitHub! ✅
 
 4. **Build Command**
    ```
-   cd signspeak-web && npm install && npm run pages:build
+   npm install && npm run build
    ```
 
 5. **Build Output Directory**
    ```
-   signspeak-web/.vercel/output/static
+   .next
    ```
+   (Leave blank or use `.next` - Cloudflare auto-detects Next.js)
 
 6. **Root Directory**
-   - Click "Advanced" if not visible
-   - Set root directory to:
-   ```
-   /
-   ```
-   (Leave as root, we handle path in build command)
+   - Leave as `/` (repository root)
+   - Next.js app is at root level
 
 7. **Environment Variables** (IMPORTANT!)
    
@@ -605,28 +602,26 @@ NEXT_PUBLIC_APP_URL=https://your-app.pages.dev
 3. Click "Create a project"
 4. Connect to GitHub: `KathiravanKOffl/SignSpeak-Final-Year-Project`
 5. Configure build:
-   - **Build command**: `npm run pages:build`
-   - **Build output directory**: `.vercel/output/static`
-   - **Root directory**: `signspeak-web`
+   - **Build command**: `npm install && npm run build`
+   - **Build output directory**: `.next` (or leave blank)
+   - **Root directory**: `/` (repository root)
 6. Click "Save and Deploy"
 7. Add environment variables in dashboard
 
 #### Option B: Manual Deployment
 
 ```bash
-cd signspeak-web
+# From repository root
+cd "/home/kathir/Study/Final Year Project/Code by Antigravity"
 
 # Install dependencies
 npm install
 
-# Build for Cloudflare Pages
-npm run pages:build
+# Build for production
+npm run build
 
-# Deploy
-npx wrangler pages deploy
-
-# Or use the combined script
-npm run pages:deploy
+# Deploy to Cloudflare Pages (requires wrangler CLI)
+# Note: Use GitHub integration instead (recommended)
 ```
 
 ### Step 3: Deploy Backend to Google Colab
@@ -670,11 +665,10 @@ Cloudflare Pages configuration file defining:
 - Future: Durable Objects, KV namespaces
 
 ### `package.json` Scripts
-- `npm run dev` - Local development
-- `npm run build` - Standard Next.js build
-- `npm run pages:build` - Build for Cloudflare Pages
-- `npm run pages:deploy` - Build + deploy to Pages
-- `npm run pages:dev` - Local Cloudflare Pages emulation
+- `npm run dev` - Local development server
+- `npm run build` - Production build
+- `npm run start` - Start production server
+- `npm run lint` - Run ESLint
 
 ---
 
@@ -746,10 +740,12 @@ Endpoints:
 
 ### Build fails
 ```bash
-# Clear cache and rebuild
-rm -rf .next .vercel
+# Clear cache and rebuild locally
+rm -rf .next node_modules
 npm install
-npm run pages:build
+npm run build
+
+# For Cloudflare Pages, trigger new deployment via dashboard
 ```
 
 ---
