@@ -28,7 +28,7 @@ fastapi==0.104.1
 uvicorn[standard]==0.24.0
 cloudflared==0.0.1  # For Cloudflare Tunnel
 python-multipart==0.0.6
-pyd antic==2.4.2
+pydantic==2.4.2
 
 # Utilities
 python-dotenv==1.0.0
