@@ -138,8 +138,8 @@ export function useMediaPipe(options: UseMediaPipeOptions = {}) {
                     : Array(21).fill([0, 0, 0]);
 
                 // Extract essential face landmarks
-                const face = faceResults.landmarks[0]
-                    ? extractEssentialFaceLandmarks(faceResults.landmarks[0])
+                const face = faceResults.faceLandmarks && faceResults.faceLandmarks[0]
+                    ? extractEssentialFaceLandmarks(faceResults.faceLandmarks[0])
                     : Array(50).fill([0, 0, 0]);
 
                 // Calculate confidence

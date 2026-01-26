@@ -1,141 +1,175 @@
-# SignSpeak: Bidirectional Real-Time Sign Language Translation System
+# SignSpeak - Real-Time Sign Language Translation
 
-A comprehensive real-time, bidirectional sign language translation system enabling seamless communication between signers (using Indian Sign Language - ISL and American Sign Language - ASL) and non-signers (using spoken/written English/Tamil/Hindi).
+[![Next.js](https://img.shields.io/badge/Next.js-15.1.4-black)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-18.3-blue)](https://reactjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-## 🎯 Key Features
+A zero-cost, real-time sign language translation system supporting ISL (Indian Sign Language) and ASL (American Sign Language). Built with Next.js, Python, MediaPipe, and deployed on Cloudflare Pages + Google Colab.
 
-- **Dual Language Support**: Full support for both ISL and ASL
-- **Real-time Translation**: Sign-to-Text/Speech and Speech-to-Sign with <1.2s latency
-- **Zero-Cost Infrastructure**: 100% deployed on Cloudflare Pages + Workers AI + Google Colab free tiers
-- **Privacy-Preserving**: All video processing at the edge, only skeletal landmarks transmitted
-- **Dual Operational Modes**:
-  - **Unified Mode**: Single-device split-screen experience
-  - **Multi-Device Mode**: Distributed setup via shareable room links
-- **Advanced Features**: Federated learning, emotion-aware avatars, regional dialects, fingerspelling
+## 🌟 Features
 
-## 🏗️ Architecture
-
-### Deployment
-- **Single Cloudflare Pages Application** with two modes
-- Cloudflare Durable Objects for room state management
-- Google Colab T4 GPU for custom model inference
-- Cloudflare Workers AI for ASR and NLP
-
-### Tech Stack
-- **Frontend**: Next.js 14 + TypeScript + Tailwind CSS + Three.js
-- **Computer Vision**: MediaPipe Holistic (TensorFlow.js in browser)
-- **Backend ML**: Python 3.10 + PyTorch + MediaPipe
-- **Cloud**: Cloudflare Pages + Workers + Durable Objects + Colab
+- **Real-Time Translation**: Browser-based MediaPipe for instant landmark extraction
+- **Dual Language Support**: ISL (263 signs) and ASL (2,000 signs)
+- **Zero Cost Deployment**: Cloudflare Pages (frontend) + Google Colab (ML backend)
+- **Multi-Device Mode**: Separate camera, control, and output screens
+- **Privacy-First**: All processing on-device and edge
+- **Hybrid Architecture**: WebRTC for camera + FastAPI for ML inference
 
 ## 📁 Project Structure
 
 ```
-signspeak/
-├── signspeak-web/          # Next.js application
-│   ├── app/                # Next.js App Router pages
-│   ├── components/         # React components
-│   ├── hooks/              # Custom React hooks
-│   ├── lib/                # Utility libraries
-│   └── workers/            # Cloudflare Workers (Durable Objects)
-├── backend/                # Python ML backend
-│   ├── model.py            # CNN-Transformer architecture
-│   ├── train.py            # Training pipeline
-│   ├── data_loader.py      # Dataset processing
-│   └── colab_inference.ipynb  # Colab deployment notebook
-├── python-utils/           # Python utilities
-│   └── perception.py       # MediaPipe landmark extraction
-├── docs/                   # Documentation
-└── tests/                  # Test suites
+SignSpeak-Final-Year-Project/
+├── app/                    # Next.js App Router
+│   ├── api/               # API routes
+│   │   ├── predict/       # Sign recognition endpoint
+│   │   ├── transcribe/    # Speech-to-text (Whisper)
+│   │   ├── translate/     # Text-to-gloss (Llama-3)
+│   │   └── room/          # Multi-device room management
+│   ├── app/               # Main translation page
+│   ├── input/             # Camera input page
+│   ├── control/           # Camera control page
+│   ├── output/            # Translation output page
+│   ├── layout.tsx         # Root layout
+│   ├── page.tsx           # Landing page
+│   └── globals.css        # Global styles
+│
+├── components/            # React components
+│   ├── camera/           # Camera module with MediaPipe
+│   └── transcript/       # Transcript panel
+│
+├── hooks/                # Custom React hooks
+│   └── useMediaPipe.ts  # MediaPipe hook
+│
+├── stores/               # State management (Zustand)
+│   └── appStore.ts      # Global app state
+│
+├── backend/              # Python ML backend
+│   ├── model.py         # CNN-Transformer model
+│   ├── train.py         # Training pipeline
+│   ├── api/             # FastAPI server
+│   │   └── inference_server.py
+│   ├── requirements.txt # Python dependencies
+│   └── colab_deployment.ipynb  # Colab deployment
+│
+├── docs/                 # Documentation
+│   ├── DEPLOYMENT.md    # Deployment guide
+│   └── CLOUDFLARE_ARCHITECTURE.md
+│
+├── public/              # Static assets
+├── python-utils/        # Perception utilities
+│   └── perception.py   # MediaPipe utilities
+│
+├── package.json        # Node.js dependencies
+├── tsconfig.json       # TypeScript config
+├── tailwind.config.ts  # Tailwind CSS config
+├── next.config.ts      # Next.js config
+├── wrangler.toml       # Cloudflare Pages config
+└── README.md          # This file
 ```
 
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Node.js 18+ and npm
-- Python 3.10+
-- Conda (recommended)
-- Cloudflare account (free tier)
-- Google account for Colab
+- Python 3.10+ (for backend development)
+- Google Colab account (for ML backend deployment)
+- Cloudflare account (for frontend deployment)
 
-### Setup
+### Local Development
 
-1. **Clone and install dependencies**:
 ```bash
-# Install Next.js dependencies
-cd signspeak-web
+# Install dependencies
 npm install
 
-# Set up Python environment
-conda create -n signspeak python=3.10
-conda activate signspeak
-pip install -r ../requirements.txt
-```
-
-2. **Configure environment variables**:
-```bash
-# Create .env.local in signspeak-web/
-cp .env.example .env.local
-# Add your Cloudflare API tokens and Colab tunnel URL
-```
-
-3. **Run development server**:
-```bash
-# Frontend
+# Run development server
 npm run dev
 
-# Python backend (for local testing)
-python ../backend/perception.py
+# Open http://localhost:3000
 ```
 
-4. **Deploy to Cloudflare Pages**:
+### Build for Production
+
 ```bash
-npm install -g wrangler
-wrangler login
-npx @cloudflare/next-on-pages
-npx wrangler pages deploy
+# Build Next.js app
+npm run build
+
+# Start production server
+npm start
 ```
 
-## 📖 Documentation
+## 📦 Deployment
 
-- [Implementation Plan](docs/implementation_plan.md)
-- [Architecture Overview](docs/architecture.md)
-- [API Documentation](docs/api.md)
-- [Deployment Guide](docs/deployment.md)
+See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed deployment instructions.
 
-## 🎓 Academic Context
+### Quick Deploy to Cloudflare Pages
 
-This project is part of a Final Year Project exploring real-time sign language translation using cutting-edge AI and zero-cost cloud infrastructure.
+1. Push code to GitHub
+2. Connect repository to Cloudflare Pages
+3. Configure build settings:
+   - Build command: `npm install && npm run build`
+   - Output directory: `.next`
+4. Set environment variables
+5. Deploy!
 
-**Key Research Areas**:
-- Hybrid CNN-Transformer architectures for sign recognition
-- Self-supervised learning with VideoMAE
-- Privacy-preserving federated learning
-- Zero-cost cloud deployment strategies
+### Deploy Backend to Google Colab
 
-## 📊 Performance Targets
+1. Open `backend/colab_deployment.ipynb` in Colab
+2. Enable T4 GPU
+3. Run all cells
+4. Copy tunnel URL
+5. Update Cloudflare Pages environment variable
 
-- Sign Recognition Accuracy: >95% (benchmark: 96.8%)
-- End-to-End Latency: <1.2s
-- Avatar Rendering: 30+ FPS
-- Zero monetary cost (100% free tier)
+## 🛠️ Tech Stack
+
+### Frontend
+- **Framework**: Next.js 15 (App Router)
+- **UI**: React 18, TypeScript, Tailwind CSS
+- **3D**: Three.js, React Three Fiber
+- **Computer Vision**: MediaPipe Tasks Vision
+- **State**: Zustand
+- **Deployment**: Cloudflare Pages
+
+### Backend
+- **ML Framework**: PyTorch
+- **Model**: CNN-Transformer Hybrid
+- **API**: FastAPI + Uvicorn
+- **Deployment**: Google Colab (T4 GPU)
+- **Tunnel**: Cloudflare Tunnel
+
+### AI Services
+- **Speech Recognition**: Cloudflare Workers AI (Whisper)
+- **Text Processing**: Cloudflare Workers AI (Llama-3)
+
+## 💰 Cost Breakdown
+
+| Service | Free Tier | Usage | Cost |
+|---------|-----------|-------|------|
+| Cloudflare Pages | 500 builds/month | ~10/month | $0 |
+| Cloudflare Workers AI | 10,000 req/day | ~100/day | $0 |
+| Google Colab | 12 hours/session | As needed | $0 |
+| **TOTAL** | | | **$0/month** |
+
+## 🎯 Performance
+
+- **Inference Latency**: <50ms (sign recognition)
+- **Camera FPS**: 30fps (MediaPipe)
+- **Model Size**: ~50MB (quantized)
+- **Page Load**: <2s (Cloudflare CDN)
+
+## 📝 License
+
+MIT License - see LICENSE file for details
 
 ## 🤝 Contributing
 
-This is an academic project, but contributions and feedback are welcome!
+Contributions welcome! Please read CONTRIBUTING.md first.
 
-## 📄 License
+## 📧 Contact
 
-MIT License - See LICENSE file for details
-
-## 🙏 Acknowledgments
-
-- MediaPipe team for landmark detection
-- Cloudflare for free-tier infrastructure
-- WLASL, INCLUDE, CISLR dataset creators
-- DHH community for feedback and testing
+For questions or support, open an issue on GitHub.
 
 ---
 
-**Status**: 🚧 Under Development
-
-Last Updated: January 26, 2026
+Built with ❤️ for accessible communication

@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export const runtime = 'edge'; // Use Edge runtime for fast responses
-
 interface LandmarksData {
     pose: number[][];
     leftHand: number[][];

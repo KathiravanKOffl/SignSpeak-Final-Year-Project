@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 
-export const runtime = 'edge';
-
 interface CreateRoomRequest {
     language?: 'isl' | 'asl';
 }

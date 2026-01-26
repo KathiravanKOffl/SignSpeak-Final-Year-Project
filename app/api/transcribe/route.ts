@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export const runtime = 'edge';
-
 interface TranscribeRequest {
     audio: string; // Base64 encoded audio
     language?: string; // Target language for transcription
