@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { useMediaPipe, LandmarksData } from '@/hooks/useMediaPipe';
 
 interface CameraModuleProps {
@@ -12,21 +12,24 @@ interface CameraModuleProps {
 export function CameraModule({ onLandmarks, showSkeleton = true, className = '' }: CameraModuleProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [stream, setStream] = useState<MediaStream | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [cameraReady, setCameraReady] = useState(false);
     const animationFrameRef = useRef<number>();
 
-    const { isLoading, error: mediaPipeError, processFrame } = useMediaPipe({ onLandmarks });
+    const [stream, setStream] = useState<MediaStream | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [videoReady, setVideoReady] = useState(false);
 
-    // Initialize camera
+    const { isLoading: mediaPipeLoading, error: mediaPipeError, processFrame } = useMediaPipe({ onLandmarks });
+
+    // Camera initialization
     useEffect(() => {
         let mounted = true;
-        let mediaStream: MediaStream | null = null;
+        let currentStream: MediaStream | null = null;
 
-        async function initCamera() {
+        async function startCamera() {
             try {
-                mediaStream = await navigator.mediaDevices.getUserMedia({
+                console.log('[Camera] Requesting camera access...');
+
+                currentStream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         width: { ideal: 1280 },
                         height: { ideal: 720 },
@@ -35,57 +38,78 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
                     audio: false,
                 });
 
-                if (mounted && videoRef.current) {
-                    const video = videoRef.current;
-
-                    // Attach metadata handler BEFORE setting srcObject to avoid race condition
-                    const handleLoadedMetadata = async () => {
-                        if (video && mounted) {
-                            try {
-                                await video.play();
-                                setCameraReady(true);
-                            } catch (playError) {
-                                console.error('Video play error:', playError);
-                                setError('Failed to start video playback');
-                            }
-                        }
-                    };
-
-                    video.onloadedmetadata = handleLoadedMetadata;
-                    video.srcObject = mediaStream;
-                    setStream(mediaStream);
-
-                    // If metadata already loaded, call handler immediately
-                    if (video.readyState >= video.HAVE_METADATA) {
-                        handleLoadedMetadata();
-                    }
+                if (!mounted) {
+                    currentStream.getTracks().forEach(track => track.stop());
+                    return;
                 }
+
+                console.log('[Camera] Camera access granted');
+                setStream(currentStream);
+
+                const video = videoRef.current;
+                if (!video) return;
+
+                // Set up video element
+                video.srcObject = currentStream;
+                video.muted = true;
+                video.playsInline = true;
+
+                // Wait for video to be loaded and playing
+                const playVideo = async () => {
+                    try {
+                        await video.play();
+                        console.log('[Camera] Video playing, waiting for data...');
+
+                        // Wait for video to have enough data
+                        const checkVideoReady = () => {
+                            if (video.readyState >= video.HAVE_ENOUGH_DATA) {
+                                console.log('[Camera] Video ready!');
+                                setVideoReady(true);
+                            } else {
+                                setTimeout(checkVideoReady, 100);
+                            }
+                        };
+                        checkVideoReady();
+                    } catch (err) {
+                        console.error('[Camera] Play error:', err);
+                        setError('Failed to start video playback. Please refresh and try again.');
+                    }
+                };
+
+                // Try to play once metadata is loaded
+                if (video.readyState >= video.HAVE_METADATA) {
+                    playVideo();
+                } else {
+                    video.addEventListener('loadedmetadata', playVideo, { once: true });
+                }
+
             } catch (err) {
-                console.error('Camera access error:', err);
+                console.error('[Camera] Access error:', err);
                 if (mounted) {
                     setError(err instanceof Error ? err.message : 'Failed to access camera');
                 }
             }
         }
 
-        initCamera();
+        startCamera();
 
         return () => {
             mounted = false;
-            // Stop tracks from the locally captured mediaStream
-            mediaStream?.getTracks().forEach((track) => track.stop());
+            console.log('[Camera] Cleaning up...');
+            currentStream?.getTracks().forEach(track => track.stop());
             if (animationFrameRef.current) {
                 cancelAnimationFrame(animationFrameRef.current);
             }
         };
-    }, []); // Empty deps - only run once on mount
+    }, []);
 
-    // Process frames
+    // Frame processing
     useEffect(() => {
-        if (!videoRef.current || isLoading || !stream || !cameraReady) {
+        if (!videoReady || !videoRef.current || mediaPipeLoading) {
             return;
         }
 
+        console.log('[Camera] Starting frame processing...');
         const video = videoRef.current;
         let lastProcessTime = 0;
         const FPS = 30;
@@ -97,18 +121,16 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
                 return;
             }
 
-            // Throttle to target FPS
             if (timestamp - lastProcessTime >= frameInterval) {
                 processFrame(video, timestamp);
 
-                // Draw skeleton overlay
                 if (showSkeleton && canvasRef.current) {
                     const canvas = canvasRef.current;
                     const ctx = canvas.getContext('2d');
-                    if (ctx) {
+                    if (ctx && video.videoWidth > 0) {
                         canvas.width = video.videoWidth;
                         canvas.height = video.videoHeight;
-                        // Drawing logic will be added when we have landmarks
+                        // Skeleton drawing will be added here
                     }
                 }
 
@@ -125,8 +147,9 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
                 cancelAnimationFrame(animationFrameRef.current);
             }
         };
-    }, [isLoading, stream, processFrame, showSkeleton, cameraReady]);
+    }, [videoReady, mediaPipeLoading, processFrame, showSkeleton]);
 
+    // Error state
     if (error || mediaPipeError) {
         return (
             <div className={`flex items-center justify-center bg-gray-800 rounded-xl ${className}`}>
@@ -139,14 +162,19 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
         );
     }
 
-    if (isLoading || !cameraReady) {
+    // Loading state
+    if (!videoReady || mediaPipeLoading) {
+        const loadingMessage = mediaPipeLoading
+            ? 'Loading MediaPipe models...'
+            : !stream
+                ? 'Requesting camera access...'
+                : 'Starting video...';
+
         return (
             <div className={`flex items-center justify-center bg-gray-900 rounded-xl ${className}`}>
                 <div className="text-center p-8">
                     <div className="text-6xl mb-4 animate-pulse">⏳</div>
-                    <p className="text-gray-300 font-semibold text-lg">
-                        {isLoading ? 'Loading MediaPipe models...' : 'Initializing camera...'}
-                    </p>
+                    <p className="text-gray-300 font-semibold text-lg">{loadingMessage}</p>
                     <p className="text-sm text-gray-400 mt-2">This may take a few seconds</p>
                     <div className="mt-4 flex justify-center">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
@@ -156,11 +184,11 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
         );
     }
 
+    // Ready state
     return (
         <div className={`relative overflow-hidden bg-black rounded-xl ${className}`}>
             <video
                 ref={videoRef}
-                autoPlay
                 playsInline
                 muted
                 className="w-full h-full object-cover transform -scale-x-100"
