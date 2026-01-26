@@ -12,7 +12,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "next": "14.3.0",
+    "next": "15.1.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "three": "^0.171.0",
@@ -31,8 +31,8 @@
   },
   "devDependencies": {
     "@cloudflare/next-on-pages": "^1.13.6",
-    "eslint": "^8.57.0",
-    "eslint-config-next": "14.3.0",
+    "eslint": "^9.18.0",
+    "eslint-config-next": "15.1.4",
     "wrangler": "^3.94.0",
     "vercel": "^37.19.0"
   }
