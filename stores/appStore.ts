@@ -30,10 +30,9 @@ interface AppState {
 
 export interface TranscriptMessage {
     id: string;
-    timestamp: number;
-    type: 'sign-to-text' | 'speech-to-sign';
-    originalText: string;
-    translatedText: string;
+    timestamp: Date | number;
+    type: 'sign' | 'speech' | 'system';
+    text: string;
     confidence?: number;
 }
 

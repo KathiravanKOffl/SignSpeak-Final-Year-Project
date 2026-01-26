@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useRef, useCallback, useState } from 'react';
 import { CameraModule } from '@/components/camera/CameraModule';
 import { TranscriptPanel } from '@/components/transcript/TranscriptPanel';
 import { useAppStore } from '@/stores/appStore';
@@ -10,12 +10,16 @@ import type { LandmarksData } from '@/hooks/useMediaPipe';
 function AppContent() {
     const searchParams = useSearchParams();
     const language = (searchParams.get('lang') || 'isl') as 'isl' | 'asl';
+    const [predictionStatus, setPredictionStatus] = useState<string>('');
+    const lastPredictionTime = useRef<number>(0);
+    const landmarkBuffer = useRef<LandmarksData[]>([]);
 
     const {
         setLanguage,
         setCurrentLandmarks,
         transcript,
         clearTranscript,
+        addTranscriptMessage,
     } = useAppStore();
 
     // Set language on mount
@@ -23,14 +27,55 @@ function AppContent() {
         setLanguage(language);
     }, [language, setLanguage]);
 
-    const handleLandmarks = (landmarks: LandmarksData) => {
+    // Send prediction to backend (throttled)
+    const sendPrediction = useCallback(async (landmarks: LandmarksData) => {
+        try {
+            const response = await fetch('/api/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    landmarks,
+                    language,
+                    top_k: 3,
+                }),
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                console.error('[Predict] API error:', error);
+                setPredictionStatus(`Error: ${error.error || 'Unknown'}`);
+                return;
+            }
+
+            const result = await response.json();
+            console.log('[Predict] Result:', result);
+
+            if (result.gloss && result.confidence > 0.5) {
+                setPredictionStatus(`${result.gloss} (${(result.confidence * 100).toFixed(0)}%)`);
+                addTranscriptMessage({
+                    id: Date.now().toString(),
+                    text: result.gloss,
+                    type: 'sign',
+                    timestamp: new Date(),
+                    confidence: result.confidence,
+                });
+            }
+        } catch (err) {
+            console.error('[Predict] Network error:', err);
+            setPredictionStatus('Network error');
+        }
+    }, [language, addTranscriptMessage]);
+
+    const handleLandmarks = useCallback((landmarks: LandmarksData) => {
         setCurrentLandmarks(landmarks);
-        // TODO: Send to backend for inference
-        console.log('Landmarks:', {
-            confidence: landmarks.confidence,
-            timestamp: landmarks.timestamp,
-        });
-    };
+
+        // Throttle predictions to every 500ms
+        const now = Date.now();
+        if (now - lastPredictionTime.current >= 500 && landmarks.confidence > 0.3) {
+            lastPredictionTime.current = now;
+            sendPrediction(landmarks);
+        }
+    }, [setCurrentLandmarks, sendPrediction]);
 
     return (
         <div className="min-h-screen bg-gray-900 text-white">

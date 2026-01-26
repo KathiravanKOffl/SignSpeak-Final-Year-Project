@@ -32,13 +32,13 @@ export function TranscriptPanel({ messages, onClear }: TranscriptPanelProps) {
                         >
                             <div className="flex items-center justify-between mb-1">
                                 <span className="text-xs text-gray-400">
-                                    {message.type === 'sign-to-text' ? '🤟 → 📝' : '🗣️ → 🤟'}
+                                    {message.type === 'sign' ? '🤟 Sign' : message.type === 'speech' ? '🗣️ Speech' : '📢 System'}
                                 </span>
                                 <span className="text-xs text-gray-500">
                                     {new Date(message.timestamp).toLocaleTimeString()}
                                 </span>
                             </div>
-                            <p className="text-white">{message.translatedText}</p>
+                            <p className="text-white">{message.text}</p>
                             {message.confidence && (
                                 <div className="mt-1 text-xs text-gray-400">
                                     Confidence: {(message.confidence * 100).toFixed(0)}%
