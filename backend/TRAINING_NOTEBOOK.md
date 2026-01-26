@@ -19,9 +19,20 @@ import os
 print("📤 Please upload your kaggle.json file...")
 uploaded = files.upload()
 
-# 3. Setup credentials
+# 3. Setup credentials (Robust method)
+import json
+import os
+
+with open('kaggle.json', 'r') as f:
+    data = json.load(f)
+    os.environ['KAGGLE_USERNAME'] = data['username']
+    os.environ['KAGGLE_KEY'] = data['key']
+
+print(f"✅ Credentials set for user: {data['username']}")
+
+# Optional: also move to config folder just in case
 !mkdir -p ~/.kaggle
-!mv kaggle.json ~/.kaggle/
+!cp kaggle.json ~/.kaggle/
 !chmod 600 ~/.kaggle/kaggle.json
 
 import torch
