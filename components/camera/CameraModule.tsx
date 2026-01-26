@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useMediaPipe, LandmarksData } from '@/hooks/useMediaPipe';
 
 interface CameraModuleProps {
@@ -16,17 +16,25 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
 
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [videoReady, setVideoReady] = useState(false);
+    const [cameraStatus, setCameraStatus] = useState<'idle' | 'requesting' | 'granted' | 'playing' | 'ready'>('idle');
 
     const { isLoading: mediaPipeLoading, error: mediaPipeError, processFrame } = useMediaPipe({ onLandmarks });
 
-    // Camera initialization
+    // Camera initialization - runs after component mount when video element exists
     useEffect(() => {
+        // Wait for video element to be in DOM
+        if (!videoRef.current) {
+            console.log('[Camera] Video element not ready, waiting...');
+            return;
+        }
+
         let mounted = true;
         let currentStream: MediaStream | null = null;
+        const video = videoRef.current;
 
         async function startCamera() {
             try {
+                setCameraStatus('requesting');
                 console.log('[Camera] Requesting camera access...');
 
                 currentStream = await navigator.mediaDevices.getUserMedia({
@@ -44,54 +52,55 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
                 }
 
                 console.log('[Camera] Camera access granted');
+                setCameraStatus('granted');
                 setStream(currentStream);
 
-                const video = videoRef.current;
-                if (!video) return;
-
-                // Set up video element
+                // Attach stream to video element
                 video.srcObject = currentStream;
                 video.muted = true;
                 video.playsInline = true;
+                console.log('[Camera] Stream attached to video element');
 
-                // Wait for video to be loaded and playing
-                const playVideo = async () => {
+                // Handle video canplay event
+                const handleCanPlay = async () => {
+                    console.log('[Camera] Video can play, starting...');
                     try {
                         await video.play();
-                        console.log('[Camera] Video playing, checking readyState...');
+                        console.log('[Camera] Video playing!');
+                        setCameraStatus('playing');
 
-                        // Wait for video to have enough data with timeout
-                        let attempts = 0;
-                        const maxAttempts = 30; // 3 seconds max wait
-
-                        const checkVideoReady = () => {
-                            attempts++;
-                            console.log(`[Camera] Ready check ${attempts}: readyState=${video.readyState} (need ${video.HAVE_ENOUGH_DATA})`);
-
+                        // Check for enough data
+                        const checkReady = () => {
                             if (video.readyState >= video.HAVE_ENOUGH_DATA) {
-                                console.log('[Camera] ✅ Video ready!');
-                                setVideoReady(true);
-                            } else if (attempts >= maxAttempts) {
-                                console.warn('[Camera] ⚠️ Timeout waiting for video data, proceeding anyway...');
-                                setVideoReady(true); // Proceed anyway
+                                console.log('[Camera] ✅ Video ready with enough data!');
+                                setCameraStatus('ready');
                             } else {
-                                setTimeout(checkVideoReady, 100);
+                                console.log(`[Camera] Waiting for data... readyState=${video.readyState}`);
+                                setTimeout(checkReady, 100);
                             }
                         };
-                        checkVideoReady();
+                        checkReady();
                     } catch (err) {
                         console.error('[Camera] Play error:', err);
-                        setError('Failed to start video playback. Please refresh and try again.');
+                        // Try autoplay with muted
+                        video.muted = true;
+                        try {
+                            await video.play();
+                            console.log('[Camera] Video playing (muted retry)!');
+                            setCameraStatus('ready');
+                        } catch (err2) {
+                            setError('Failed to start video. Please click the page and refresh.');
+                        }
                     }
                 };
 
-                // Try to play once metadata is loaded
-                if (video.readyState >= video.HAVE_METADATA) {
-                    console.log('[Camera] Metadata already loaded, playing...');
-                    playVideo();
-                } else {
-                    console.log('[Camera] Waiting for metadata...');
-                    video.addEventListener('loadedmetadata', playVideo, { once: true });
+                // Listen for canplay event
+                video.addEventListener('canplay', handleCanPlay, { once: true });
+
+                // If already can play, trigger manually
+                if (video.readyState >= video.HAVE_FUTURE_DATA) {
+                    video.removeEventListener('canplay', handleCanPlay);
+                    handleCanPlay();
                 }
 
             } catch (err) {
@@ -112,11 +121,11 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
                 cancelAnimationFrame(animationFrameRef.current);
             }
         };
-    }, []);
+    }, []); // Run once on mount
 
-    // Frame processing
+    // Frame processing - only when camera is ready and MediaPipe is loaded
     useEffect(() => {
-        if (!videoReady || !videoRef.current || mediaPipeLoading) {
+        if (cameraStatus !== 'ready' || !videoRef.current || mediaPipeLoading) {
             return;
         }
 
@@ -141,7 +150,6 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
                     if (ctx && video.videoWidth > 0) {
                         canvas.width = video.videoWidth;
                         canvas.height = video.videoHeight;
-                        // Skeleton drawing will be added here
                     }
                 }
 
@@ -158,7 +166,21 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
                 cancelAnimationFrame(animationFrameRef.current);
             }
         };
-    }, [videoReady, mediaPipeLoading, processFrame, showSkeleton]);
+    }, [cameraStatus, mediaPipeLoading, processFrame, showSkeleton]);
+
+    // Determine what message to show
+    const getLoadingMessage = () => {
+        if (mediaPipeLoading) return 'Loading AI models...';
+        switch (cameraStatus) {
+            case 'idle': return 'Initializing...';
+            case 'requesting': return 'Requesting camera access...';
+            case 'granted': return 'Setting up video...';
+            case 'playing': return 'Almost ready...';
+            default: return 'Loading...';
+        }
+    };
+
+    const isLoading = cameraStatus !== 'ready' || mediaPipeLoading;
 
     // Error state
     if (error || mediaPipeError) {
@@ -173,50 +195,52 @@ export function CameraModule({ onLandmarks, showSkeleton = true, className = '' 
         );
     }
 
-    // Loading state
-    if (!videoReady || mediaPipeLoading) {
-        const loadingMessage = mediaPipeLoading
-            ? 'Loading MediaPipe models...'
-            : !stream
-                ? 'Requesting camera access...'
-                : 'Starting video...';
-
-        return (
-            <div className={`flex items-center justify-center bg-gray-900 rounded-xl ${className}`}>
-                <div className="text-center p-8">
-                    <div className="text-6xl mb-4 animate-pulse">⏳</div>
-                    <p className="text-gray-300 font-semibold text-lg">{loadingMessage}</p>
-                    <p className="text-sm text-gray-400 mt-2">This may take a few seconds</p>
-                    <div className="mt-4 flex justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    // Ready state
+    // ALWAYS render video element - hide it during loading
     return (
         <div className={`relative overflow-hidden bg-black rounded-xl ${className}`}>
+            {/* Video element - ALWAYS in DOM, hidden during loading */}
             <video
                 ref={videoRef}
                 playsInline
                 muted
-                className="w-full h-full object-cover transform -scale-x-100"
+                className={`w-full h-full object-cover transform -scale-x-100 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                style={{ transition: 'opacity 0.3s ease' }}
             />
-            {showSkeleton && (
+
+            {/* Canvas overlay for skeleton */}
+            {showSkeleton && !isLoading && (
                 <canvas
                     ref={canvasRef}
                     className="absolute top-0 left-0 w-full h-full pointer-events-none transform -scale-x-100"
                 />
             )}
-            <div className="absolute top-4 right-4 flex items-center space-x-2 bg-black/50 backdrop-blur px-3 py-1 rounded-lg">
-                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                <span className="text-sm text-white">Live</span>
-            </div>
-            <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur px-3 py-1 rounded-lg text-xs text-white">
-                Processing at 30 FPS
-            </div>
+
+            {/* Loading overlay */}
+            {isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+                    <div className="text-center p-8">
+                        <div className="text-6xl mb-4 animate-pulse">⏳</div>
+                        <p className="text-gray-300 font-semibold text-lg">{getLoadingMessage()}</p>
+                        <p className="text-sm text-gray-400 mt-2">This may take a few seconds</p>
+                        <div className="mt-4 flex justify-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Live indicator - only when ready */}
+            {!isLoading && (
+                <>
+                    <div className="absolute top-4 right-4 flex items-center space-x-2 bg-black/50 backdrop-blur px-3 py-1 rounded-lg">
+                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                        <span className="text-sm text-white">Live</span>
+                    </div>
+                    <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur px-3 py-1 rounded-lg text-xs text-white">
+                        Processing at 30 FPS
+                    </div>
+                </>
+            )}
         </div>
     );
 }
