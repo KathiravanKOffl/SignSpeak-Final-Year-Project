@@ -1,5 +1,14 @@
 import Link from 'next/link';
-import AvatarCanvas from './components/AvatarCanvas';
+import dynamic from 'next/dynamic';
+
+// Force dynamic rendering (no SSR) to prevent framer-motion issues
+export const dynamic = 'force-dynamic';
+
+// Lazy load Avatar to prevent SSR issues
+const AvatarCanvas = dynamic(() => import('./components/AvatarCanvas'), {
+  ssr: false,
+  loading: () => <div className="w-full h-[500px] bg-gray-900 rounded-xl animate-pulse" />
+});
 
 export default function Home() {
   return (
