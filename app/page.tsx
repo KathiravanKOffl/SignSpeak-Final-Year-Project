@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import AvatarCanvas from './components/AvatarCanvas';
 
 export default function Home() {
   return (
@@ -17,34 +18,44 @@ export default function Home() {
           </p>
         </div>
 
+        {/* 3D Avatar Preview */}
+        <div className="max-w-2xl mx-auto mb-16">
+          <AvatarCanvas />
+        </div>
+
         {/* Language Selection */}
         <div className="max-w-4xl mx-auto mb-12">
           <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-6 text-center">
             Select Sign Language
           </h2>
           <div className="grid md:grid-cols-2 gap-6">
-            {/* ISL Card */}
-            <Link href="/app?lang=isl">
-              <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer border-2 border-transparent hover:border-blue-500">
-                <div className="text-5xl mb-4 text-center">🇮🇳</div>
-                <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-2 text-center">
-                  Indian Sign Language
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400 text-center">
-                  ISL • 263 signs vocabulary
-                </p>
+            {/* ISL Card - Coming Soon */}
+            <div className="bg-white/50 dark:bg-gray-800/50 rounded-2xl p-8 shadow-lg relative overflow-hidden cursor-not-allowed opacity-75">
+              <div className="absolute top-3 right-3 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                Coming Soon
               </div>
-            </Link>
+              <div className="text-5xl mb-4 text-center grayscale">🇮🇳</div>
+              <h3 className="text-2xl font-bold text-gray-600 dark:text-gray-400 mb-2 text-center">
+                Indian Sign Language
+              </h3>
+              <p className="text-gray-500 dark:text-gray-500 text-center">
+                ISL • In Development
+              </p>
+            </div>
 
-            {/* ASL Card */}
+            {/* ASL Card - Active */}
             <Link href="/app?lang=asl">
-              <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer border-2 border-transparent hover:border-indigo-500">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer border-2 border-indigo-500 ring-2 ring-indigo-500/30 relative">
+                <div className="absolute top-3 right-3 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                  Active
+                </div>
                 <div className="text-5xl mb-4 text-center">🇺🇸</div>
                 <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-2 text-center">
                   American Sign Language
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400 text-center">
-                  ASL • 2,000 signs vocabulary
+                  ASL • 2,000+ signs vocabulary
                 </p>
               </div>
             </Link>

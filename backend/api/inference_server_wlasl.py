@@ -59,7 +59,7 @@ class PredictionResponse(BaseModel):
     processing_time_ms: float
 
 
-def load_simple_classifier(num_classes: int = 100):
+def load_simple_classifier(num_classes: int = 100, input_dim: int = 225):
     """Create a simple classifier for ASL signs."""
     import torch.nn as nn
     
@@ -82,7 +82,61 @@ def load_simple_classifier(num_classes: int = 100):
                 x = x.mean(dim=1)  # Average over sequence
             return self.net(x)
             
-    return SimpleASLClassifier(num_classes=num_classes)
+    return SimpleASLClassifier(input_dim=input_dim, num_classes=num_classes)
+
+
+def load_temporal_lstm(input_dim: int = 150, hidden_dim: int = 256, num_classes: int = 25, num_layers: int = 2, dropout: float = 0.4):
+    """Create TemporalLSTM model matching Kaggle training architecture."""
+    import torch.nn as nn
+    
+    class TemporalLSTM(nn.Module):
+        """
+        LSTM that processes temporal sequences of landmarks
+        Input: (batch, 30, 150) - 30 frames, 150 features each
+        """
+        def __init__(self, input_dim, hidden_dim, num_classes, num_layers, dropout):
+            super().__init__()
+            
+            # Input projection
+            self.input_proj = nn.Sequential(
+                nn.Linear(input_dim, hidden_dim),
+                nn.LayerNorm(hidden_dim),
+                nn.ReLU(),
+                nn.Dropout(dropout)
+            )
+            
+            # Bidirectional LSTM
+            self.lstm = nn.LSTM(
+                input_size=hidden_dim,
+                hidden_size=hidden_dim,
+                num_layers=num_layers,
+                batch_first=True,
+                bidirectional=True,
+                dropout=dropout if num_layers > 1 else 0
+            )
+            
+            # Classification head
+            self.classifier = nn.Sequential(
+                nn.Linear(hidden_dim * 2, hidden_dim),
+                nn.ReLU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim, num_classes)
+            )
+        
+        def forward(self, x):
+            # x: (batch, 30, 150)
+            x = self.input_proj(x)  # (batch, 30, hidden)
+            lstm_out, (h_n, c_n) = self.lstm(x)  # lstm_out: (batch, 30, hidden*2)
+            
+            # Use last hidden states from both directions
+            # h_n: (num_layers*2, batch, hidden)
+            forward_h = h_n[-2]  # Last layer, forward
+            backward_h = h_n[-1]  # Last layer, backward
+            combined = torch.cat([forward_h, backward_h], dim=1)  # (batch, hidden*2)
+            
+            return self.classifier(combined)
+    
+    return TemporalLSTM(input_dim, hidden_dim, num_classes, num_layers, dropout)
 
 
 @app.on_event("startup")
@@ -140,14 +194,33 @@ async def load_model():
             # Extract info
             num_classes = checkpoint.get('num_classes', 100)
             input_dim = checkpoint.get('input_dim', 225)
+            model_type = checkpoint.get('model_type', 'SimpleASLClassifier')
             
-            wlasl_model = load_simple_classifier(input_dim=input_dim, num_classes=num_classes)
+            # Load appropriate architecture
+            if model_type == 'TemporalLSTM':
+                logger.info("Detected TemporalLSTM model")
+                config = checkpoint.get('config', {})
+                hidden_dim = config.get('hidden_dim', 256)
+                num_layers = config.get('lstm_layers', 2)
+                dropout = config.get('dropout', 0.4)
+                
+                wlasl_model = load_temporal_lstm(
+                    input_dim=input_dim,
+                    hidden_dim=hidden_dim,
+                    num_classes=num_classes,
+                    num_layers=num_layers,
+                    dropout=dropout
+                )
+            else:
+                logger.info("Loading SimpleASLClassifier")
+                wlasl_model = load_simple_classifier(input_dim=input_dim, num_classes=num_classes)
+            
             if 'model_state_dict' in checkpoint:
                 wlasl_model.load_state_dict(checkpoint['model_state_dict'])
                 
             wlasl_model.to(device)
             wlasl_model.eval()
-            logger.info("✅ Loaded PyTorch .pth model")
+            logger.info(f"✅ Loaded PyTorch {model_type} model ({num_classes} classes)")
 
         # 3. Fallback: Pre-trained WLASL Weights
         else:

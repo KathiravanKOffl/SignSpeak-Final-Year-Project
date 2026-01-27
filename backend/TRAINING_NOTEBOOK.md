@@ -1,82 +1,127 @@
-# SignSpeak Training Notebook - Final Working Version (Option 2)
+# SignSpeak Training - Synthetic Data (Guaranteed to Work) 🛡️
 
-**Goal:** Deployment without dataset headaches.
-**Strategy:** Download a working pre-trained model directly from GitHub.
+Since external downloads are blocked/broken, we will train on **Generated Synthetic Data**.
+This allows us to test the **Full Pipeline** (Frontend <-> Backend) immediately.
 
 ---
 
 ## 🟢 Cell 1: Setup
-Install dependencies.
 
 ```python
-!pip install -q torch numpy pandas scikit-learn tqdm
+!pip install -q torch numpy pandas scikit-learn
 
 import torch
+import numpy as np
 import os
-import urllib.request
 import json
+import shutil
+from sklearn.model_selection import train_test_split
+from torch.utils.data import Dataset, DataLoader
+import torch.nn as nn
+import torch.optim as optim
+
 print(f"✅ Setup complete! GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'}")
 ```
 
 ---
 
-## 🟢 Cell 2: Download Pre-trained Model (Direct)
-We will use a community model (rabBit64) trained on MediaPipe landmarks.
+## 🟢 Cell 2: Generate Synthetic Data
+We create fake landmark data for 3 classes: `hello`, `thanks`, `iloveyou`.
 
 ```python
-print("📥 Downloading pre-trained model...")
+print("🎲 Generating synthetic data...")
 
-# Create checkpoint dir
-os.makedirs('checkpoints', exist_ok=True)
+# Parameters matching our MediaPipe input (225 features)
+NUM_SAMPLES = 1000
+NUM_CLASSES = 3
+INPUT_DIM = 225 
+CLASSES = ['hello', 'thanks', 'iloveyou']
 
-# Correct raw URL for the model
-model_url = "https://github.com/rabBit64/Sign-language-recognition-with-RNN-and-Mediapipe/raw/main/action.h5"
-try:
-    urllib.request.urlretrieve(model_url, "checkpoints/action.h5")
-    print("✅ Model 'action.h5' downloaded!")
-except:
-    # Fallback name if action.h5 doesn't exist
-    model_url = "https://github.com/rabBit64/Sign-language-recognition-with-RNN-and-Mediapipe/raw/main/model.h5"
-    urllib.request.urlretrieve(model_url, "checkpoints/best_model.h5")
-    print("✅ Model 'best_model.h5' downloaded!")
+# Generate random features
+X = np.random.randn(NUM_SAMPLES, INPUT_DIM).astype(np.float32)
 
-# Create corresponding label mapping
-# Based on rabBit64 repo: ['hello', 'thanks', 'iloveyou']
-labels = ['hello', 'thanks', 'iloveyou'] 
-mapping = {
-    'id_to_label': {i: l for i, l in enumerate(labels)},
-    'label_to_id': {l: i for i, l in enumerate(labels)}
+# Generate labels (0, 1, 2)
+y = np.random.randint(0, NUM_CLASSES, NUM_SAMPLES)
+
+print(f"✅ Generated {NUM_SAMPLES} samples.")
+print(f"Classes: {CLASSES}")
+
+# Create mapping
+label_mapping = {
+    'id_to_label': {str(i): c for i, c in enumerate(CLASSES)},
+    'label_to_id': {c: i for i, c in enumerate(CLASSES)}
 }
-with open("checkpoints/label_mapping.json", 'w') as f:
-    json.dump(mapping, f)
 
-print("✅ Label mapping created")
+# Save mapping
+with open('label_mapping.json', 'w') as f:
+    json.dump(label_mapping, f)
+print("✅ Saved label_mapping.json")
 ```
 
 ---
 
-## 🟢 Cell 3: Deploy to Backend
-Updates your backend to use this new model.
+## 🟢 Cell 3: Train Model (Fast)
 
 ```python
-import shutil
+# Dataset Class
+class SyntheticDataset(Dataset):
+    def __init__(self, X, y):
+        self.X = torch.FloatTensor(X)
+        self.y = torch.LongTensor(y)
+    def __len__(self): return len(self.X)
+    def __getitem__(self, i): return self.X[i], self.y[i]
 
-# 1. Update repo (clean start)
+# Simple Model
+model = nn.Sequential(
+    nn.Linear(INPUT_DIM, 64),
+    nn.ReLU(),
+    nn.Linear(64, NUM_CLASSES)
+)
+
+# Train Loop
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+model = model.to(device)
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=0.01)
+
+train_loader = DataLoader(SyntheticDataset(X, y), batch_size=32, shuffle=True)
+
+print("🚀 Training...")
+for epoch in range(5):
+    for X_b, y_b in train_loader:
+        X_b, y_b = X_b.to(device), y_b.to(device)
+        optimizer.zero_grad()
+        loss = criterion(model(X_b), y_b)
+        loss.backward()
+        optimizer.step()
+    print(f"Epoch {epoch+1} done.")
+
+# Save
+torch.save({
+    'model_state_dict': model.state_dict(),
+    'num_classes': NUM_CLASSES,
+    'input_dim': INPUT_DIM
+}, 'best_model.pth')
+
+print("✅ Model trained and saved as 'best_model.pth'")
+```
+
+---
+
+## 🟢 Cell 4: Deploy & Restart Server
+
+```python
+# 1. Clone/Update Repo
 if os.path.exists('/content/SignSpeak-Final-Year-Project'):
     !rm -rf /content/SignSpeak-Final-Year-Project
 !git clone https://github.com/KathiravanKOffl/SignSpeak-Final-Year-Project.git
 
-# 2. Copy model
+# 2. Deploy Model
 dest = '/content/SignSpeak-Final-Year-Project/backend/checkpoints/'
 os.makedirs(dest, exist_ok=True)
-
-if os.path.exists("checkpoints/action.h5"):
-    shutil.copy("checkpoints/action.h5", dest + "best_model.h5")
-elif os.path.exists("checkpoints/best_model.h5"):
-    shutil.copy("checkpoints/best_model.h5", dest + "best_model.h5")
-    
-shutil.copy("checkpoints/label_mapping.json", dest)
-print(f"✅ Model deployed to: {dest}")
+shutil.copy('best_model.pth', dest)
+shutil.copy('label_mapping.json', dest)
+print(f"✅ Model deployed to {dest}")
 
 # 3. Start Server
 print("\n🚀 RESTARTING SERVER...")
