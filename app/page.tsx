@@ -1,13 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
-
-// Lazy load Avatar to prevent SSR issues with Three.js/framer-motion
-const AvatarCanvas = dynamic(() => import('./components/AvatarCanvas'), {
-  ssr: false,
-  loading: () => <div className="w-full h-[500px] bg-gray-900 rounded-xl animate-pulse" />
-});
+import AvatarPlaceholder from './components/AvatarPlaceholder';
 
 export default function Home() {
   return (
@@ -26,9 +20,9 @@ export default function Home() {
           </p>
         </div>
 
-        {/* 3D Avatar Preview */}
+        {/* Avatar Preview */}
         <div className="max-w-2xl mx-auto mb-16">
-          <AvatarCanvas />
+          <AvatarPlaceholder emotion="neutral" />
         </div>
 
         {/* Language Selection */}
@@ -109,6 +103,6 @@ export default function Home() {
           <p className="mt-2">Supporting accessibility and breaking communication barriers</p>
         </div>
       </div>
-    </main>
+    </main >
   );
 }
