@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 
 interface TranslationPanelProps {
     currentGloss?: string;
@@ -49,52 +48,43 @@ export default function TranslationPanel({
 
                 {/* Emotion indicator */}
                 <div className="flex items-center gap-2">
-                    <span className={`w-3 h-3 rounded-full ${emotionColors[emotion]}`} />
+                    <span className={`w-3 h-3 rounded-full ${emotionColors[emotion]} transition-colors duration-300`} />
                     <span className="text-sm text-white/70 capitalize">{emotion}</span>
                 </div>
             </div>
 
             {/* Live transcription area */}
             <div className="bg-black/30 rounded-xl p-4 min-h-[120px] mb-4">
-                <AnimatePresence mode="popLayout">
-                    {displayedGlosses.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                            {displayedGlosses.map((gloss, index) => (
-                                <motion.span
-                                    key={`${gloss}-${index}`}
-                                    initial={{ opacity: 0, scale: 0.8, y: 10 }}
-                                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.8 }}
-                                    transition={{ duration: 0.2 }}
-                                    className={`
-                    px-3 py-1.5 rounded-lg font-mono text-sm
-                    ${index === displayedGlosses.length - 1
-                                            ? 'bg-blue-500 text-white'
-                                            : 'bg-white/20 text-white/80'}
-                  `}
-                                >
-                                    {gloss}
-                                </motion.span>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-white/50 text-center">
-                            {mode === 'sign-to-text'
-                                ? 'Start signing to see translation...'
-                                : 'Type or speak to see gloss...'}
-                        </p>
-                    )}
-                </AnimatePresence>
+                {displayedGlosses.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                        {displayedGlosses.map((gloss, index) => (
+                            <span
+                                key={`${gloss}-${index}`}
+                                className={`
+                                    px-3 py-1.5 rounded-lg font-mono text-sm
+                                    transition-all duration-200 animate-fade-in
+                                    ${index === displayedGlosses.length - 1
+                                        ? 'bg-blue-500 text-white scale-105'
+                                        : 'bg-white/20 text-white/80'}
+                                `}
+                            >
+                                {gloss}
+                            </span>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-white/50 text-center">
+                        {mode === 'sign-to-text'
+                            ? 'Start signing to see translation...'
+                            : 'Type or speak to see gloss...'}
+                    </p>
+                )}
 
                 {/* Question indicator */}
                 {isQuestion && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="mt-2 text-xs text-yellow-400 flex items-center gap-1"
-                    >
+                    <div className="mt-2 text-xs text-yellow-400 flex items-center gap-1 animate-fade-in">
                         <span>❓</span> Question detected (non-manual markers required)
-                    </motion.div>
+                    </div>
                 )}
             </div>
 
@@ -105,11 +95,9 @@ export default function TranslationPanel({
                     <span>{Math.round(confidence * 100)}%</span>
                 </div>
                 <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
-                    <motion.div
-                        className="h-full bg-gradient-to-r from-blue-500 to-green-500 rounded-full"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${confidence * 100}%` }}
-                        transition={{ duration: 0.3 }}
+                    <div
+                        className="h-full bg-gradient-to-r from-blue-500 to-green-500 rounded-full transition-all duration-300"
+                        style={{ width: `${confidence * 100}%` }}
                     />
                 </div>
             </div>
@@ -123,6 +111,16 @@ export default function TranslationPanel({
                     </p>
                 </div>
             )}
+
+            <style jsx>{`
+                @keyframes fade-in {
+                    from { opacity: 0; transform: scale(0.9) translateY(5px); }
+                    to { opacity: 1; transform: scale(1) translateY(0); }
+                }
+                .animate-fade-in {
+                    animation: fade-in 0.2s ease-out;
+                }
+            `}</style>
         </div>
     );
 }
