@@ -1,10 +1,7 @@
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 
-// Force dynamic rendering (no SSR) to prevent framer-motion issues
-export const dynamic = 'force-dynamic';
-
-// Lazy load Avatar to prevent SSR issues
+// Lazy load Avatar to prevent SSR issues with Three.js/framer-motion
 const AvatarCanvas = dynamic(() => import('./components/AvatarCanvas'), {
   ssr: false,
   loading: () => <div className="w-full h-[500px] bg-gray-900 rounded-xl animate-pulse" />
