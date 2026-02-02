@@ -199,7 +199,7 @@ async def predict(request: LandmarkRequest):
         
         # Inference
         with torch.no_grad():
-            logits, features = model(landmarks_tensor, language=request.language.lower())
+            logits = model(landmarks_tensor, language=request.language.lower())
             probabilities = torch.softmax(logits, dim=1)[0]  # (num_classes,)
         
         # Get top-k predictions
