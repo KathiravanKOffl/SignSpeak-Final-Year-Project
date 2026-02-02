@@ -27,7 +27,7 @@ export function useMediaPipe(options: UseMediaPipeOptions = {}) {
 
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isProcessing, setIsProcessing] = useState(false);
+    const isProcessingRef = useRef(false);
 
     const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
     const handLandmarkerRef = useRef<HandLandmarker | null>(null);
@@ -110,12 +110,12 @@ export function useMediaPipe(options: UseMediaPipeOptions = {}) {
                 !poseLandmarkerRef.current ||
                 !handLandmarkerRef.current ||
                 !faceLandmarkerRef.current ||
-                isProcessing
+                isProcessingRef.current
             ) {
                 return;
             }
 
-            setIsProcessing(true);
+            isProcessingRef.current = true;
 
             try {
                 // Process all landmarks
@@ -167,16 +167,16 @@ export function useMediaPipe(options: UseMediaPipeOptions = {}) {
             } catch (err) {
                 console.error('Frame processing error:', err);
             } finally {
-                setIsProcessing(false);
+                isProcessingRef.current = false;
             }
         },
-        [isProcessing, onLandmarks]
+        [onLandmarks]
     );
 
     return {
         isLoading,
         error,
-        isProcessing,
+        isProcessing: isProcessingRef.current,
         processFrame,
     };
 }
