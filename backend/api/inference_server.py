@@ -25,13 +25,14 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Add CORS middleware
+# Add CORS middleware - Allow all origins for flexibility
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Cloudflare Pages domain
+    allow_origins=["*"],  # Allow all origins (Cloudflare Pages + local testing)
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Allow all HTTP methods
+    allow_headers=["*"],  # Allow all headers
+    expose_headers=["*"]  # Expose all response headers
 )
 
 # Global model instance
@@ -130,6 +131,12 @@ async def root():
     }
 
 
+@app.options("/{full_path:path}")
+async def options_handler(full_path: str):
+    """Handle CORS preflight requests for all routes."""
+    return {"message": "OK"}
+
+
 @app.get("/health")
 async def health():
     """Detailed health check."""
@@ -169,13 +176,26 @@ async def predict(request: LandmarkRequest):
         # Convert landmarks to tensor
         landmarks_array = np.array(request.landmarks, dtype=np.float32)
         
+        # Expected input: 408 dims (136 landmarks × 3 coords)
         # Reshape if needed
         if len(landmarks_array.shape) == 1:
-            # Assuming flattened (seq_len * 543)
-            seq_len = len(landmarks_array) // 543
-            landmarks_array = landmarks_array.reshape(seq_len, 543)
+            # Assuming flattened (seq_len * 408)
+            seq_len = len(landmarks_array) // 408
+            if seq_len * 408 != len(landmarks_array):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid landmark size: expected multiple of 408, got {len(landmarks_array)}"
+                )
+            landmarks_array = landmarks_array.reshape(seq_len, 408)
         
-        landmarks_tensor = torch.from_numpy(landmarks_array).unsqueeze(0).to(device)  # (1, seq_len, 543)
+        # Validate shape
+        if landmarks_array.shape[-1] != 408:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid landmark dimension: expected 408, got {landmarks_array.shape[-1]}"
+            )
+        
+        landmarks_tensor = torch.from_numpy(landmarks_array).unsqueeze(0).to(device)  # (1, seq_len, 408)
         
         # Inference
         with torch.no_grad():
