@@ -5,6 +5,8 @@ import { Suspense, useEffect, useRef, useCallback, useState } from 'react';
 import { CameraModule } from '@/components/camera/CameraModule';
 import { TranscriptPanel } from '@/components/transcript/TranscriptPanel';
 import { useAppStore } from '@/stores/appStore';
+import { useInference } from '@/hooks/useInference';
+import { useSpeech } from '@/hooks/useSpeech';
 import type { LandmarksData } from '@/hooks/useMediaPipe';
 
 function AppContent() {
@@ -22,6 +24,10 @@ function AppContent() {
         addTranscriptMessage,
     } = useAppStore();
 
+    // Initialize hooks
+    const { predict, isLoading: predictLoading, error: predictError } = useInference();
+    const { speak, isSpeaking } = useSpeech();
+
     // Set language on mount
     useEffect(() => {
         setLanguage(language);
@@ -29,48 +35,29 @@ function AppContent() {
 
     // Send prediction to backend (throttled)
     const sendPrediction = useCallback(async (landmarks: LandmarksData) => {
-        try {
-            const response = await fetch('/api/predict', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    landmarks,
-                    language,
-                    top_k: 3,
-                }),
-            });
+        const result = await predict(landmarks, language);
 
-            if (!response.ok) {
-                const error = await response.json();
-                console.error('[Predict] API error:', error);
-                setPredictionStatus(`Error: ${error.error || 'Unknown'}`);
-                return;
+        if (result && result.gloss) {
+            const conf = result.confidence || 0;
+            setPredictionStatus(`${result.gloss} (${(conf * 100).toFixed(0)}%)`);
+
+            // Add to transcript with confidence threshold
+            if (conf > 0.3) {  // Only show confident predictions
+                addTranscriptMessage({
+                    id: Date.now().toString(),
+                    text: result.gloss,
+                    type: 'sign',
+                    timestamp: new Date(),
+                    confidence: conf,
+                });
+
+                // Speak the prediction
+                speak(result.gloss);
             }
-
-            const result = await response.json();
-            console.log('[Predict] Result:', result);
-
-            // Always show predictions (even low confidence for demo)
-            if (result.gloss) {
-                const conf = result.confidence || 0;
-                setPredictionStatus(`${result.gloss} (${(conf * 100).toFixed(0)}%)`);
-
-                // Add to transcript (lower threshold for demo)
-                if (conf > 0.01) {
-                    addTranscriptMessage({
-                        id: Date.now().toString(),
-                        text: result.gloss,
-                        type: 'sign',
-                        timestamp: new Date(),
-                        confidence: conf,
-                    });
-                }
-            }
-        } catch (err) {
-            console.error('[Predict] Network error:', err);
-            setPredictionStatus('Network error');
+        } else if (predictError) {
+            setPredictionStatus(`Error: ${predictError}`);
         }
-    }, [language, addTranscriptMessage]);
+    }, [language, predict, speak, addTranscriptMessage, predictError]);
 
     const handleLandmarks = useCallback((landmarks: LandmarksData) => {
         setCurrentLandmarks(landmarks);

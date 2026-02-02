@@ -67,29 +67,50 @@ async def load_model():
     logger.info(f"Loading model on device: {device}")
     
     try:
-        # Create model
+        # Create model with ISL-123 configuration
         model = SignRecognitionModel(
-            input_dim=543,
-            hidden_dim=256,
-            num_isl_classes=263,
-            num_asl_classes=2000
+            input_dim=408,  # 136 landmarks × 3
+            hidden_dim=384,  # Match trained model
+            num_isl_classes=123,
+            num_asl_classes=123,  # Placeholder
+            num_heads=8,
+            num_layers=4,
+            dropout=0.4
         ).to(device)
         
-        # Load weights (update path as needed)
-        checkpoint_path = Path('./checkpoints/best_model.pth')
+        # Load weights for ISL-123 model
+        checkpoint_path = Path('./checkpoints/best_isl_123.pth')
         if checkpoint_path.exists():
             checkpoint = torch.load(checkpoint_path, map_location=device)
-            model.load_state_dict(checkpoint['model_state_dict'])
-            logger.info(f"Loaded checkpoint from {checkpoint_path}")
+            # Handle different checkpoint formats
+            if 'model' in checkpoint:
+                model.load_state_dict(checkpoint['model'])
+            elif 'model_state_dict' in checkpoint:
+                model.load_state_dict(checkpoint['model_state_dict'])
+            else:
+                model.load_state_dict(checkpoint)
+            logger.info(f"✅ Loaded ISL-123 checkpoint from {checkpoint_path}")
         else:
-            logger.warning("No checkpoint found, using random weights")
+            logger.warning(f"⚠️ No checkpoint found at {checkpoint_path}, using random weights")
         
         model.eval()
         
-        # Load class mappings (update paths as needed)
-        # TODO: Load actual class mappings from files
-        isl_classes = {i: f"ISL_SIGN_{i}" for i in range(263)}
-        asl_classes = {i: f"ASL_SIGN_{i}" for i in range(2000)}
+        # Load class mappings from JSON
+        mapping_path = Path('./checkpoints/label_mapping_123.json')
+        if mapping_path.exists():
+            import json
+            with open(mapping_path, 'r') as f:
+                mapping_data = json.load(f)
+                # Expect format: {"0": "adult", "1": "alright", ...}
+                isl_classes = {int(k): v for k, v in mapping_data.items()}
+            logger.info(f"✅ Loaded {len(isl_classes)} ISL class mappings")
+        else:
+            # Fallback to dummy mappings
+            logger.warning("⚠️ No label mapping found, using placeholders")
+            isl_classes = {i: f"ISL_SIGN_{i}" for i in range(123)}
+        
+        # ASL not implemented yet
+        asl_classes = {i: f"ASL_SIGN_{i}" for i in range(123)}
         
         logger.info("Model loaded successfully!")
         

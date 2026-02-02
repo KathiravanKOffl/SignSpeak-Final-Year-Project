@@ -9,13 +9,13 @@ class SignRecognitionModel(nn.Module):
     """
     def __init__(
         self, 
-        input_dim: int = 543, 
-        hidden_dim: int = 256, 
-        num_isl_classes: int = 263, 
-        num_asl_classes: int = 2000,
+        input_dim: int = 408,  # 136 landmarks × 3 coords (updated for ISL-123)
+        hidden_dim: int = 384,  # Match trained model
+        num_isl_classes: int = 123,  # Actual number of ISL classes
+        num_asl_classes: int = 123,  # Placeholder (not used yet)
         num_heads: int = 8,
         num_layers: int = 4,
-        dropout: float = 0.1
+        dropout: float = 0.4  # Match training config
     ):
         super().__init__()
         
