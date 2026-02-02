@@ -16,7 +16,7 @@ export default function Home() {
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  const { predict, isLoading: isPredicting } = useInference();
+  const { predict, isLoading: isPredicting, getBufferSize, BUFFER_SIZE } = useInference();
   const { speak } = useSpeech();
 
   // Handle landmarks and make predictions
@@ -39,9 +39,9 @@ export default function Home() {
       }
     }
 
-    // Throttle predictions to every 600ms
+    // Throttle to ~100ms for smooth buffer fill (10 fps)
     const now = Date.now();
-    if (now - lastPredictTime.current < 600) return;
+    if (now - lastPredictTime.current < 100) return;
 
     // Check if hands are visible
     const hasHands = data.leftHand.some(p => p[0] !== 0) || data.rightHand.some(p => p[0] !== 0);
@@ -198,8 +198,8 @@ export default function Home() {
           {/* Status Badge */}
           <div className="absolute top-4 left-4">
             <div className={`px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-md border flex items-center gap-2 ${isCameraActive
-                ? 'bg-green-500/20 text-green-300 border-green-500/30'
-                : 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30'
+              ? 'bg-green-500/20 text-green-300 border-green-500/30'
+              : 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30'
               }`}>
               <div className={`w-2 h-2 rounded-full ${isCameraActive ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`} />
               {isCameraActive ? 'LIVE' : 'INITIALIZING...'}
@@ -215,6 +215,24 @@ export default function Home() {
               </div>
             </div>
           )}
+
+          {/* Buffer Progress Bar */}
+          <div className="absolute bottom-4 left-4 right-4">
+            <div className="bg-black/40 backdrop-blur-md rounded-lg p-2">
+              <div className="flex items-center justify-between text-xs text-slate-300 mb-1">
+                <span>Recording gesture...</span>
+                <span>{getBufferSize()}/{BUFFER_SIZE} frames</span>
+              </div>
+              <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-indigo-500 to-purple-500"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(getBufferSize() / BUFFER_SIZE) * 100}%` }}
+                  transition={{ duration: 0.1 }}
+                />
+              </div>
+            </div>
+          </div>
 
         </motion.div>
 
