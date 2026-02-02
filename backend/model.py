@@ -19,8 +19,8 @@ class SignRecognitionModel(nn.Module):
     ):
         super().__init__()
         
-        # Input Embedding
-        self.embedding = nn.Sequential(
+        # Input Embedding (name must match checkpoint: 'embed')
+        self.embed = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.LayerNorm(hidden_dim),
             nn.ReLU(),
@@ -37,9 +37,14 @@ class SignRecognitionModel(nn.Module):
         )
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
         
-        # Classification Heads
-        self.isl_head = nn.Linear(hidden_dim, num_isl_classes)
-        self.asl_head = nn.Linear(hidden_dim, num_asl_classes)
+        # Classification Head (name must match checkpoint: 'classifier')
+        # Note: Checkpoint only has one classifier, used for ISL
+        self.classifier = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim // 2, num_isl_classes)
+        )
         
     def forward(self, x, language='isl'):
         """
@@ -50,19 +55,15 @@ class SignRecognitionModel(nn.Module):
             logits: Prediction scores
             features: Extracted temporal features
         """
-        # Embed landmarks
-        x = self.embedding(x) # (B, S, H)
+        # Embed input
+        x = self.embed(x)  # (batch, seq_len, hidden_dim)
         
-        # Process sequence with Transformer
-        x = self.transformer(x) # (B, S, H)
+        # Transformer encoding
+        x = self.transformer(x)  # (batch, seq_len, hidden_dim)
         
-        # Global Average Pooling over temporal dimension
-        features = x.mean(dim=1) # (B, H)
+        # Pool: mean over sequence
+        x = x.mean(dim=1)  # (batch, hidden_dim)
         
-        # Select appropriate head
-        if language.lower() == 'isl':
-            logits = self.isl_head(features)
-        else:
-            logits = self.asl_head(features)
-            
-        return logits, features
+        # Classify
+        logits = self.classifier(x)  # (batch, num_classes)
+        return logits
