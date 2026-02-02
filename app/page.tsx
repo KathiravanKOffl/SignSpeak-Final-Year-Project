@@ -10,7 +10,7 @@ export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastPredictTime = useRef(0);
   const lastSpokenRef = useRef<string>('');
-  
+
   const [currentSign, setCurrentSign] = useState<string | null>(null);
   const [confidence, setConfidence] = useState(0);
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -26,7 +26,7 @@ export default function Home() {
       const ctx = canvasRef.current.getContext('2d');
       if (ctx) {
         ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-        
+
         // Draw hands (green dots)
         ctx.fillStyle = '#4ade80';
         [...data.leftHand, ...data.rightHand].forEach(pt => {
@@ -51,8 +51,10 @@ export default function Home() {
 
     try {
       const result = await predict(data, 'isl');
-      
-      if (result && result.confidence > 0.5) {
+
+      // Show prediction if we have a result (low threshold for now)
+      if (result && result.gloss) {
+        console.log('[App] Showing prediction:', result.gloss, 'confidence:', result.confidence);
         setCurrentSign(result.gloss);
         setConfidence(result.confidence);
 
@@ -82,23 +84,23 @@ export default function Home() {
         stream = await navigator.mediaDevices.getUserMedia({
           video: { width: 640, height: 480, facingMode: 'user' }
         });
-        
+
         if (!mounted || !videoRef.current) return;
-        
+
         videoRef.current.srcObject = stream;
-        
+
         videoRef.current.onloadedmetadata = () => {
           if (!videoRef.current || !mounted) return;
-          
+
           videoRef.current.play().then(() => {
             if (!mounted) return;
-            
+
             // Set canvas size
             if (canvasRef.current && videoRef.current) {
               canvasRef.current.width = videoRef.current.videoWidth || 640;
               canvasRef.current.height = videoRef.current.videoHeight || 480;
             }
-            
+
             setIsCameraActive(true);
             setIsInitialized(true);
           }).catch(console.error);
@@ -138,7 +140,7 @@ export default function Home() {
     };
 
     animationId = requestAnimationFrame(loop);
-    
+
     return () => {
       if (animationId) {
         cancelAnimationFrame(animationId);
@@ -148,7 +150,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-black text-white overflow-hidden relative">
-      
+
       {/* Background Glow */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/15 rounded-full blur-[100px]" />
@@ -156,9 +158,9 @@ export default function Home() {
       </div>
 
       <div className="relative z-10 container mx-auto px-4 min-h-screen flex flex-col items-center justify-center py-8">
-        
+
         {/* Header */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-8"
@@ -172,34 +174,33 @@ export default function Home() {
         </motion.div>
 
         {/* Camera Container */}
-        <motion.div 
+        <motion.div
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.4 }}
           className="relative w-full max-w-2xl aspect-video rounded-2xl overflow-hidden shadow-2xl shadow-indigo-500/20 border border-white/10"
         >
           {/* Video Feed */}
-          <video 
+          <video
             ref={videoRef}
-            className="w-full h-full object-cover transform scale-x-[-1]" 
-            playsInline 
-            muted 
+            className="w-full h-full object-cover transform scale-x-[-1]"
+            playsInline
+            muted
             autoPlay
           />
-          
+
           {/* Skeleton Canvas Overlay */}
-          <canvas 
+          <canvas
             ref={canvasRef}
             className="absolute inset-0 w-full h-full transform scale-x-[-1] pointer-events-none"
           />
 
           {/* Status Badge */}
           <div className="absolute top-4 left-4">
-            <div className={`px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-md border flex items-center gap-2 ${
-              isCameraActive 
-                ? 'bg-green-500/20 text-green-300 border-green-500/30' 
+            <div className={`px-3 py-1.5 rounded-full text-xs font-medium backdrop-blur-md border flex items-center gap-2 ${isCameraActive
+                ? 'bg-green-500/20 text-green-300 border-green-500/30'
                 : 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30'
-            }`}>
+              }`}>
               <div className={`w-2 h-2 rounded-full ${isCameraActive ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`} />
               {isCameraActive ? 'LIVE' : 'INITIALIZING...'}
             </div>
