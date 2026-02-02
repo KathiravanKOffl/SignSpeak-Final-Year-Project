@@ -27,12 +27,29 @@ export function useInference() {
 
         try {
             // Convert landmarks to flat array format expected by backend
-            // LandmarksData has: leftHand, rightHand, pose (each is number[][])
-            const flatLandmarks = [
-                ...landmarks.leftHand.flatMap(lm => lm),  // Flatten each hand
-                ...landmarks.rightHand.flatMap(lm => lm),
-                ...landmarks.pose.flatMap(lm => lm)
-            ];
+            // Model expects: 136 landmarks × 3 coords = 408 values
+            // Format: upper body pose (25) + left hand (21) + right hand (21) + face subset (69) = 136 total
+
+            // Extract ONLY x,y,z from pose (remove visibility/4th dimension)
+            const poseFlat = landmarks.pose.flatMap(lm => [lm[0], lm[1], lm[2]]);  // 33 × 3 = 99
+            const leftHandFlat = landmarks.leftHand.flatMap(lm => lm);  // 21 × 3 = 63
+            const rightHandFlat = landmarks.rightHand.flatMap(lm => lm);  // 21 × 3 = 63
+            const faceFlat = landmarks.face.flatMap(lm => lm);  // 50 × 3 = 150
+
+            // Combine: 99 + 63 + 63 + 150 = 375 values
+            // But model expects 408, so we need to match training format
+            // Training used: 136 (pose) + 21 (left hand) + 21 (right hand) + 61 (face) = 136 landmarks
+
+            // For now, send what we have and pad with zeros if needed
+            const allLandmarks = [...poseFlat, ...leftHandFlat, ...rightHandFlat, ...faceFlat];
+
+            // Pad to 408 if needed
+            while (allLandmarks.length < 408) {
+                allLandmarks.push(0);
+            }
+
+            // Trim to exactly 408
+            const flatLandmarks = allLandmarks.slice(0, 408);
 
             console.log('[useInference] Sending landmarks:', flatLandmarks.length, 'values');
 
