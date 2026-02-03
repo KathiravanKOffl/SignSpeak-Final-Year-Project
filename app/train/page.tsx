@@ -108,6 +108,15 @@ export default function TrainPage() {
         frameId = requestAnimationFrame(loop);
         return () => cancelAnimationFrame(frameId);
     }, [isCameraActive, isModelLoading, processFrame]);
+    // MediaPipe hand connections
+    const HAND_CONNECTIONS = [
+        [0, 1], [1, 2], [2, 3], [3, 4],
+        [0, 5], [5, 6], [6, 7], [7, 8],
+        [0, 9], [9, 10], [10, 11], [11, 12],
+        [0, 13], [13, 14], [14, 15], [15, 16],
+        [0, 17], [17, 18], [18, 19], [19, 20],
+        [5, 9], [9, 13], [13, 17]
+    ];
 
     // Draw skeleton using MediaPipe's official DrawingUtils
     const drawSkeleton = (data: LandmarksData) => {
@@ -129,12 +138,10 @@ export default function TrainPage() {
         if (data.leftHand.some(pt => pt[0] !== 0)) {
             const leftHandLandmarks = toMPLandmarks(data.leftHand);
 
-            // Draw connections
             drawingUtils.drawConnectors(
                 leftHandLandmarks,
-                // @ts-ignore
-                DrawingUtils.HAND_CONNECTIONS,
-                { color: '#10B981', lineWidth: 3 }
+                HAND_CONNECTIONS,
+                { color: '#10B981', lineWidth: 4 }
             );
 
             // Draw landmarks
@@ -148,12 +155,10 @@ export default function TrainPage() {
         if (data.rightHand.some(pt => pt[0] !== 0)) {
             const rightHandLandmarks = toMPLandmarks(data.rightHand);
 
-            // Draw connections
             drawingUtils.drawConnectors(
                 rightHandLandmarks,
-                // @ts-ignore
-                DrawingUtils.HAND_CONNECTIONS,
-                { color: '#3B82F6', lineWidth: 3 }
+                HAND_CONNECTIONS,
+                { color: '#3B82F6', lineWidth: 4 }
             );
 
             // Draw landmarks
