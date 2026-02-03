@@ -108,6 +108,16 @@ export default function TrainPage() {
         return () => cancelAnimationFrame(frameId);
     }, [isCameraActive, isModelLoading, processFrame]);
 
+    // MediaPipe hand connections
+    const HAND_CONNECTIONS = [
+        [0, 1], [1, 2], [2, 3], [3, 4],       // Thumb
+        [0, 5], [5, 6], [6, 7], [7, 8],       // Index
+        [0, 9], [9, 10], [10, 11], [11, 12],  // Middle
+        [0, 13], [13, 14], [14, 15], [15, 16],// Ring
+        [0, 17], [17, 18], [18, 19], [19, 20],// Pinky
+        [5, 9], [9, 13], [13, 17]             // Palm
+    ];
+
     // Draw skeleton on canvas
     const drawSkeleton = (data: LandmarksData) => {
         if (!canvasRef.current) return;
@@ -115,21 +125,42 @@ export default function TrainPage() {
         const ctx = canvasRef.current.getContext('2d');
         if (!ctx) return;
 
-        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        const width = canvasRef.current.width;
+        const height = canvasRef.current.height;
 
-        // Draw hands (emerald green)
-        ctx.fillStyle = '#10B981';
-        [...data.leftHand, ...data.rightHand].forEach(pt => {
-            if (pt[0] !== 0 && pt[1] !== 0) {
-                ctx.beginPath();
-                ctx.arc(
-                    pt[0] * canvasRef.current!.width,
-                    pt[1] * canvasRef.current!.height,
-                    4, 0, 2 * Math.PI
-                );
-                ctx.fill();
-            }
-        });
+        ctx.clearRect(0, 0, width, height);
+
+        // Helper to draw hand
+        const drawHand = (hand: number[][], color: string) => {
+            // Draw connections (lines)
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            HAND_CONNECTIONS.forEach(([start, end]) => {
+                const startPt = hand[start];
+                const endPt = hand[end];
+
+                if (startPt[0] !== 0 && startPt[1] !== 0 && endPt[0] !== 0 && endPt[1] !== 0) {
+                    ctx.beginPath();
+                    ctx.moveTo(startPt[0] * width, startPt[1] * height);
+                    ctx.lineTo(endPt[0] * width, endPt[1] * height);
+                    ctx.stroke();
+                }
+            });
+
+            // Draw joints (circles)
+            ctx.fillStyle = color;
+            hand.forEach(pt => {
+                if (pt[0] !== 0 && pt[1] !== 0) {
+                    ctx.beginPath();
+                    ctx.arc(pt[0] * width, pt[1] * height, 5, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+            });
+        };
+
+        // Draw both hands (different colors)
+        drawHand(data.leftHand, '#10B981');   // Left = Green
+        drawHand(data.rightHand, '#3B82F6');  // Right = Blue
     };
 
     // Start recording

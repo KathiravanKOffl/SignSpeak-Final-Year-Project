@@ -1,10 +1,22 @@
 import { create } from 'zustand';
 
-// Tier 1 vocabulary (start with these)
-export const TIER1_VOCABULARY = [
-    'I', 'you', 'he', 'she',
-    'want', 'need', 'go', 'come',
-    'to', 'can'
+// Complete vocabulary (50 words across all tiers)
+export const FULL_VOCABULARY = [
+    // Tier 1: Grammar Core (10 words)
+    'I', 'you', 'he', 'she', 'want', 'need', 'go', 'come', 'to', 'can',
+
+    // Tier 2: Common Verbs (15 words)
+    'eat', 'drink', 'help', 'sleep', 'work', 'study', 'play',
+    'sit', 'stand', 'walk', 'run', 'stop', 'give', 'take', 'like',
+
+    // Tier 3: Essential Nouns (15 words)
+    'home', 'school', 'hospital', 'toilet', 'water', 'food',
+    'phone', 'money', 'medicine', 'mother', 'father',
+    'friend', 'doctor', 'teacher', 'child',
+
+    // Tier 4: Modifiers (10 words)
+    'good', 'bad', 'big', 'small', 'hot', 'cold',
+    'now', 'later', 'today', 'tomorrow'
 ];
 
 export interface TrainingSample {
@@ -42,9 +54,9 @@ interface TrainingState {
 
 export const useTrainingStore = create<TrainingState>((set, get) => ({
     // Initial state
-    currentWord: TIER1_VOCABULARY[0],
+    currentWord: FULL_VOCABULARY[0],
     currentWordIndex: 0,
-    vocabulary: TIER1_VOCABULARY,
+    vocabulary: FULL_VOCABULARY,
     samplesPerWord: 40,
     samples: [],
     isRecording: false,
