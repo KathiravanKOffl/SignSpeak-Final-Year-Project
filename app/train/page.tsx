@@ -107,14 +107,14 @@ export default function TrainPage() {
         frameId = requestAnimationFrame(loop);
         return () => cancelAnimationFrame(frameId);
     }, [isCameraActive, isModelLoading, processFrame]);
-    // MediaPipe pose connections
+    // MediaPipe pose connections (excluding wrist/hand landmarks)
     const POSE_CONNECTIONS = [
         // Torso
         [11, 12], [11, 23], [12, 24], [23, 24],
-        // Left arm
-        [11, 13], [13, 15], [15, 17], [15, 19], [15, 21], [17, 19],
-        // Right arm  
-        [12, 14], [14, 16], [16, 18], [16, 20], [16, 22], [18, 20],
+        // Left arm (stop at elbow, exclude wrist)
+        [11, 13], [13, 15],
+        // Right arm (stop at elbow, exclude wrist)
+        [12, 14], [14, 16],
         // Face
         [0, 1], [1, 2], [2, 3], [3, 7], [0, 4], [4, 5], [5, 6], [6, 8],
         // Left leg
@@ -216,27 +216,10 @@ export default function TrainPage() {
             });
         };
 
-        // Helper to draw face landmarks
-        const drawFace = (face: number[][], color: string) => {
-            face.forEach(pt => {
-                if (pt && pt[0] !== 0 && pt[1] !== 0) {
-                    ctx.fillStyle = color;
-                    ctx.beginPath();
-                    ctx.arc(pt[0] * width, pt[1] * height, 2, 0, 2 * Math.PI);
-                    ctx.fill();
-                }
-            });
-        };
-
         // Use RAW coordinates (0-1 range) for accurate screen drawing
         // Draw body pose (purple/magenta)
         if (data.rawPose && data.rawPose.some(pt => pt[0] !== 0)) {
             drawPose(data.rawPose, '#A855F7');
-        }
-
-        // Draw face (yellow)
-        if (data.rawFace && data.rawFace.some(pt => pt[0] !== 0)) {
-            drawFace(data.rawFace, '#EAB308');
         }
 
         // Draw left hand (green)
