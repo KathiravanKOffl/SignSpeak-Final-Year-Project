@@ -30,11 +30,17 @@ interface TrainingState {
     currentWordIndex: number;
     vocabulary: string[];
     samplesPerWord: number;
+    isAutoMode: boolean;
 
     // Collection state
     samples: TrainingSample[];
     isRecording: boolean;
     recordingProgress: number; // 0-100
+
+    // Countdown state
+    isCountdown: boolean;
+    countdownValue: number; // 5, 4, 3, 2, 1
+    isPaused: boolean;
 
     // UI state
     showPreview: boolean;
@@ -42,9 +48,15 @@ interface TrainingState {
 
     // Actions
     setCurrentWord: (word: string, index: number) => void;
+    setAutoMode: (auto: boolean) => void;
+    startCountdown: () => void;
     startRecording: () => void;
     stopRecording: () => void;
     setRecordingProgress: (progress: number) => void;
+    setCountdownValue: (value: number) => void;
+    setIsCountdown: (counting: boolean) => void;
+    pauseTraining: () => void;
+    resumeTraining: () => void;
     confirmSample: (frames: any[]) => void;
     retrySample: () => void;
     downloadCache: () => void;
@@ -58,9 +70,13 @@ export const useTrainingStore = create<TrainingState>((set, get) => ({
     currentWordIndex: 0,
     vocabulary: FULL_VOCABULARY,
     samplesPerWord: 40,
+    isAutoMode: false,
     samples: [],
     isRecording: false,
     recordingProgress: 0,
+    isCountdown: false,
+    countdownValue: 5,
+    isPaused: false,
     showPreview: false,
     previewData: null,
 
@@ -68,6 +84,18 @@ export const useTrainingStore = create<TrainingState>((set, get) => ({
     setCurrentWord: (word, index) => set({
         currentWord: word,
         currentWordIndex: index
+    }),
+
+    setAutoMode: (auto) => set({ isAutoMode: auto }),
+
+    setCountdownValue: (value) => set({ countdownValue: value }),
+
+    setIsCountdown: (counting) => set({ isCountdown: counting }),
+
+    startCountdown: () => set({
+        isCountdown: true,
+        countdownValue: 5,
+        showPreview: false
     }),
 
     startRecording: () => set({
@@ -79,6 +107,10 @@ export const useTrainingStore = create<TrainingState>((set, get) => ({
     stopRecording: () => set({ isRecording: false }),
 
     setRecordingProgress: (progress) => set({ recordingProgress: progress }),
+
+    pauseTraining: () => set({ isPaused: true }),
+
+    resumeTraining: () => set({ isPaused: false }),
 
     confirmSample: (frames) => {
         const { samples, currentWord, samplesPerWord, nextWord } = get();
