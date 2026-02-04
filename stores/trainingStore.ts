@@ -48,6 +48,7 @@ interface TrainingState {
     // UI state
     showPreview: boolean;
     previewData: any[] | null;
+    isWordComplete: boolean; // Persists until user clicks 'Start Next Word'
 
     // Actions
     setCurrentWord: (word: string, index: number) => void;
@@ -66,6 +67,7 @@ interface TrainingState {
     downloadCache: () => void;
     nextWord: () => void;
     resetWord: () => void;
+    setWordComplete: (complete: boolean) => void;
 }
 
 export const useTrainingStore = create<TrainingState>((set, get) => ({
@@ -84,6 +86,7 @@ export const useTrainingStore = create<TrainingState>((set, get) => ({
     isPaused: false,
     showPreview: false,
     previewData: null,
+    isWordComplete: false,
 
     // Actions
     setCurrentWord: (word, index) => set({
@@ -139,13 +142,7 @@ export const useTrainingStore = create<TrainingState>((set, get) => ({
             previewData: null
         });
 
-        // Auto-advance if we've reached target
-        if (updatedSamples.length >= samplesPerWord) {
-            // Trigger download
-            setTimeout(() => {
-                get().downloadCache();
-            }, 500);
-        }
+        // Auto-advance check handled in UI components
     },
 
     retrySample: () => set({
@@ -196,12 +193,15 @@ export const useTrainingStore = create<TrainingState>((set, get) => ({
                 currentWord: vocabulary[nextIndex],
                 samples: [],
                 showPreview: false,
-                previewData: null
+                previewData: null,
+                isWordComplete: false // Reset for next word
             });
         } else {
             alert('All words completed! 🎉');
         }
     },
 
-    resetWord: () => set({ samples: [] })
+    resetWord: () => set({ samples: [], isWordComplete: false }),
+
+    setWordComplete: (complete) => set({ isWordComplete: complete })
 }));

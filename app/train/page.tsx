@@ -50,7 +50,9 @@ export default function TrainPage() {
         resumeTraining,
         confirmSample,
         retrySample,
-        resetWord
+        resetWord,
+        isWordComplete,
+        setWordComplete
     } = useTrainingStore();
 
     // MediaPipe initialization
@@ -274,7 +276,13 @@ export default function TrainPage() {
 
         if (currentCount >= target) {
             setIsStarted(false); // Force stop auto mode
+            setWordComplete(true); // Mark word as complete - PERSISTS until user clicks next
             setStatus('Training complete!');
+
+            // Trigger download
+            setTimeout(() => {
+                useTrainingStore.getState().downloadCache();
+            }, 500);
         } else {
             setStatus(`Sample ${currentCount}/${target} saved`);
         }
@@ -305,12 +313,10 @@ export default function TrainPage() {
     };
 
     const handleNextWord = () => {
-        nextWord();
+        nextWord(); // This resets isWordComplete to false in store
         setStatus('Ready next word');
         setIsStarted(false);
     };
-
-    const isComplete = samples.length >= samplesPerWord;
 
     return (
         <>
@@ -370,7 +376,7 @@ export default function TrainPage() {
 
                     {/* Right Column: Controls or Completion */}
                     <div className="flex flex-col gap-4">
-                        {isComplete ? (
+                        {isWordComplete ? (
                             // Completion UI
                             <div className="h-full bg-white rounded-2xl shadow-sm border border-slate-200 p-8 flex flex-col items-center justify-center text-center">
                                 <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6">
