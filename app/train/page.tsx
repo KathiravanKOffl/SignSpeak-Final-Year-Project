@@ -25,6 +25,7 @@ export default function TrainPage() {
     const [status, setStatus] = useState<string>('Initializing...');
     const [showWordChanger, setShowWordChanger] = useState(false);
     const [selectedTier, setSelectedTier] = useState<string | null>(null);
+    const [isStarted, setIsStarted] = useState(false); // Track if user clicked START
 
     const {
         currentWord,
@@ -66,9 +67,11 @@ export default function TrainPage() {
                 const progress = Math.min((elapsed / 2000) * 100, 100);
                 setRecordingProgress(progress);
 
-                // Auto-stop after 2 seconds
+                // Auto-stop after 2 seconds (with small buffer to ensure progress hits 100%)
                 if (elapsed >= 2000) {
-                    handleAutoStop();
+                    // Ensure progress shows 100% before stopping
+                    setRecordingProgress(100);
+                    setTimeout(() => handleAutoStop(), 50);
                 }
             }
         }
@@ -235,19 +238,20 @@ export default function TrainPage() {
         }
     }, [isCountdown, isPaused]);
 
-    // Auto-mode: immediately start next countdown after recording
+    // Auto-mode: immediately start next countdown after recording (only if user clicked START)
     useEffect(() => {
-        if (!isCountdown && !isRecording && samples.length < samplesPerWord && !isPaused) {
+        if (isStarted && !isCountdown && !isRecording && samples.length < samplesPerWord && !isPaused) {
             const timer = setTimeout(() => {
                 startCountdown();
             }, 500);
             return () => clearTimeout(timer);
         }
-    }, [isCountdown, isRecording, samples.length, samplesPerWord, isPaused]);
+    }, [isStarted, isCountdown, isRecording, samples.length, samplesPerWord, isPaused]);
 
     const handleStart = () => {
         frameBufferRef.current = [];
         recordingStartRef.current = Date.now();
+        setIsStarted(true); // Enable auto mode
         startRecording();
         setStatus('Recording...');
     };
@@ -259,6 +263,15 @@ export default function TrainPage() {
         // Auto-confirm - immediately save and continue
         confirmSample(normalized);
         setStatus(`Sample ${samples.length + 1}/${samplesPerWord} saved`);
+    };
+
+    const handleCancel = () => {
+        setIsStarted(false); // Stop auto mode
+        setIsCountdown(false);
+        if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+        }
+        setStatus('Ready to start');
     };
 
     const handleWordChange = (word: string) => {
@@ -461,8 +474,8 @@ export default function TrainPage() {
                                                     key={word}
                                                     onClick={() => handleWordChange(word)}
                                                     className={`py-2 sm:py-2.5 px-2 sm:px-3 rounded-lg text-xs sm:text-sm font-medium transition-all ${word === currentWord
-                                                            ? 'bg-blue-600 text-white'
-                                                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                                                         }`}
                                                 >
                                                     {word}
