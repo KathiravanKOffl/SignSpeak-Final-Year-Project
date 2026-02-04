@@ -319,22 +319,6 @@ export default function TrainPage() {
         setIsStarted(false);
     };
 
-    const handleRetry = () => {
-        // Clear the frame buffer completely
-        frameBufferRef.current = [];
-        isProcessingStopRef.current = false;
-
-        // Reset countdown/recording state
-        retrySample();
-        setIsCountdown(false);
-        setIsStarted(false);
-        if (countdownIntervalRef.current) {
-            clearInterval(countdownIntervalRef.current);
-        }
-        setStatus('Ready to retry');
-    };
-
-
     return (
         <>
             <main className="min-h-screen bg-[#F8F9FA] flex flex-col items-center justify-center p-4 sm:p-6">
@@ -494,21 +478,12 @@ export default function TrainPage() {
                                                 >
                                                     {isPaused ? '▶ RESUME' : '⏸ PAUSE'}
                                                 </button>
-                                                {isPaused ? (
-                                                    <button
-                                                        onClick={handleRetry}
-                                                        className="py-4 bg-rose-500 text-white rounded-xl font-bold text-lg hover:bg-rose-600 shadow-md transition-colors"
-                                                    >
-                                                        ↺ RETRY
-                                                    </button>
-                                                ) : (
-                                                    <button
-                                                        onClick={handleCancel}
-                                                        className="py-4 bg-slate-200 text-slate-600 rounded-xl font-bold text-lg hover:bg-slate-300 transition-colors"
-                                                    >
-                                                        ✕ CANCEL
-                                                    </button>
-                                                )}
+                                                <button
+                                                    onClick={handleCancel}
+                                                    className="py-4 bg-slate-200 text-slate-600 rounded-xl font-bold text-lg hover:bg-slate-300 transition-colors"
+                                                >
+                                                    ✕ CANCEL
+                                                </button>
                                             </>
                                         )}
                                     </div>
