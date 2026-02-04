@@ -267,7 +267,17 @@ export default function TrainPage() {
 
         // Auto-confirm - immediately save and continue  
         confirmSample(normalized);
-        setStatus(`Sample ${samples.length + 1}/${samplesPerWord} saved`);
+
+        // Check if we're done
+        const currentCount = useTrainingStore.getState().samples.length;
+        const target = useTrainingStore.getState().samplesPerWord;
+
+        if (currentCount >= target) {
+            setIsStarted(false); // Force stop auto mode
+            setStatus('Training complete!');
+        } else {
+            setStatus(`Sample ${currentCount}/${target} saved`);
+        }
 
         // Reset guard for next recording
         setTimeout(() => {
@@ -307,11 +317,6 @@ export default function TrainPage() {
                 <div className="p-4 sm:p-5 border-b bg-white">
                     <div className="max-w-7xl mx-auto px-1">
                         <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">Training Session</h1>
-                        <p className="text-slate-500 text-sm mt-1 font-medium">
-                            {samplesPerWord} samples per word
-                            <span className="mx-2 text-slate-300">•</span>
-                            {selectedTier ? selectedTier.split(':')[0] : 'Custom Selection'}
-                        </p>
                     </div>
                 </div>
 
