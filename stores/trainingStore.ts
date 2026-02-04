@@ -176,11 +176,7 @@ export const useTrainingStore = create<TrainingState>((set, get) => ({
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-
-        // Move to next word
-        setTimeout(() => {
-            get().nextWord();
-        }, 1000);
+        // User must manually click "Start Next Word" to proceed
     },
 
     nextWord: () => {

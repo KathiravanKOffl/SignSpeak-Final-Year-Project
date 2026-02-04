@@ -240,15 +240,15 @@ export default function TrainPage() {
         }
     }, [isCountdown, isPaused]);
 
-    // Auto-mode: immediately start next countdown after recording (only if user clicked START)
+    // Auto-mode: immediately start next countdown after recording (only if user clicked START and word not complete)
     useEffect(() => {
-        if (isStarted && !isCountdown && !isRecording && samples.length < samplesPerWord && !isPaused) {
+        if (isStarted && !isCountdown && !isRecording && !isWordComplete && samples.length < samplesPerWord && !isPaused) {
             const timer = setTimeout(() => {
                 startCountdown();
             }, 500);
             return () => clearTimeout(timer);
         }
-    }, [isStarted, isCountdown, isRecording, samples.length, samplesPerWord, isPaused]);
+    }, [isStarted, isCountdown, isRecording, isWordComplete, samples.length, samplesPerWord, isPaused]);
 
     const handleStart = () => {
         frameBufferRef.current = [];
