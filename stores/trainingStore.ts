@@ -107,7 +107,7 @@ export const useTrainingStore = create<TrainingState>((set, get) => ({
 
     startCountdown: () => set({
         isCountdown: true,
-        countdownValue: 5,
+        countdownValue: 3,
         showPreview: false
     }),
 
