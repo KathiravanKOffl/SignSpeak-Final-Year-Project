@@ -163,8 +163,12 @@ export default function TrainPage() {
                 }
             });
 
-            // Draw joints
-            pose.forEach(pt => {
+
+            // Draw joints (skip wrist/hand landmarks 15-22 to avoid overlap with hand skeleton)
+            pose.forEach((pt, idx) => {
+                // Skip wrist and hand landmarks (15=left wrist, 16=right wrist, 17-22=hand points)
+                if (idx >= 15 && idx <= 22) return;
+
                 if (pt && pt[0] !== 0 && pt[1] !== 0) {
                     ctx.fillStyle = color;
                     ctx.beginPath();
