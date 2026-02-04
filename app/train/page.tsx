@@ -361,7 +361,10 @@ export default function TrainPage() {
                         <div className="grid grid-cols-2 gap-2 sm:gap-3">
                             {!isRecording && !isCountdown && (
                                 <button
-                                    onClick={startCountdown}
+                                    onClick={() => {
+                                        setIsStarted(true);
+                                        startCountdown();
+                                    }}
                                     disabled={!isCameraActive || isModelLoading}
                                     className="col-span-2 py-4 sm:py-5 bg-blue-600 text-white rounded-xl font-bold text-lg sm:text-xl hover:bg-blue-700 disabled:opacity-50 shadow-lg"
                                 >
@@ -381,8 +384,7 @@ export default function TrainPage() {
                                         <button
                                             onClick={() => {
                                                 retrySample();
-                                                setIsCountdown(false);
-                                                if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+                                                handleCancel();
                                             }}
                                             className="py-3 sm:py-4 bg-red-500 text-white rounded-xl font-bold text-sm sm:text-base"
                                         >
@@ -390,10 +392,7 @@ export default function TrainPage() {
                                         </button>
                                     ) : (
                                         <button
-                                            onClick={() => {
-                                                setIsCountdown(false);
-                                                if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-                                            }}
+                                            onClick={handleCancel}
                                             className="py-3 sm:py-4 bg-red-500 text-white rounded-xl font-bold text-sm sm:text-base"
                                         >
                                             ✕ CANCEL
