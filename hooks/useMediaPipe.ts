@@ -8,6 +8,9 @@ export interface LandmarksData {
     leftHand: number[][];
     rightHand: number[][];
     face: number[][];
+    // Raw coordinates (0-1 range) for drawing on screen
+    rawLeftHand: number[][];
+    rawRightHand: number[][];
     confidence: number;
     timestamp: number;
 }
@@ -154,11 +157,14 @@ export function useMediaPipe(options: UseMediaPipeOptions = {}) {
                     leftHand,
                     rightHand,
                     face,
+                    // Keep raw coordinates for drawing (before normalization)
+                    rawLeftHand: leftHand.map(pt => [...pt]),
+                    rawRightHand: rightHand.map(pt => [...pt]),
                     confidence,
                     timestamp,
                 };
 
-                // Normalize landmarks
+                // Normalize landmarks for ML training
                 const normalized = normalizeLandmarks(landmarks);
 
                 if (onLandmarks) {

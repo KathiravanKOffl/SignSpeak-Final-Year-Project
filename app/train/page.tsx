@@ -129,14 +129,15 @@ export default function TrainPage() {
 
         const drawingUtils = new DrawingUtils(ctx);
 
-        // Convert normalized landmarks to MediaPipe format
+        // Convert to MediaPipe format {x, y, z}
         const toMPLandmarks = (landmarks: number[][]) => {
             return landmarks.map(([x, y, z]) => ({ x, y, z: z || 0 }));
         };
 
+        // Use RAW coordinates (0-1 range) for accurate screen drawing
         // Draw left hand (green)
-        if (data.leftHand.some(pt => pt[0] !== 0)) {
-            const leftHandLandmarks = toMPLandmarks(data.leftHand);
+        if (data.rawLeftHand && data.rawLeftHand.some(pt => pt[0] !== 0)) {
+            const leftHandLandmarks = toMPLandmarks(data.rawLeftHand);
 
             drawingUtils.drawConnectors(
                 leftHandLandmarks,
@@ -144,16 +145,15 @@ export default function TrainPage() {
                 { color: '#10B981', lineWidth: 4 }
             );
 
-            // Draw landmarks
             drawingUtils.drawLandmarks(
                 leftHandLandmarks,
-                { color: '#10B981', fillColor: '#FFFFFF', radius: 3 }
+                { color: '#10B981', fillColor: '#FFFFFF', radius: 4 }
             );
         }
 
         // Draw right hand (blue)
-        if (data.rightHand.some(pt => pt[0] !== 0)) {
-            const rightHandLandmarks = toMPLandmarks(data.rightHand);
+        if (data.rawRightHand && data.rawRightHand.some(pt => pt[0] !== 0)) {
+            const rightHandLandmarks = toMPLandmarks(data.rawRightHand);
 
             drawingUtils.drawConnectors(
                 rightHandLandmarks,
@@ -161,10 +161,9 @@ export default function TrainPage() {
                 { color: '#3B82F6', lineWidth: 4 }
             );
 
-            // Draw landmarks
             drawingUtils.drawLandmarks(
                 rightHandLandmarks,
-                { color: '#3B82F6', fillColor: '#FFFFFF', radius: 3 }
+                { color: '#3B82F6', fillColor: '#FFFFFF', radius: 4 }
             );
         }
     };
