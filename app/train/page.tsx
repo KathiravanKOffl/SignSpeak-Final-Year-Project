@@ -5,7 +5,6 @@ import { useMediaPipe, LandmarksData } from '@/hooks/useMediaPipe';
 import { useTrainingStore } from '@/stores/trainingStore';
 import { resampleToN, flattenFrame } from '@/utils/frameNormalization';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DrawingUtils } from '@mediapipe/tasks-vision';
 
 export default function TrainPage() {
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -118,53 +117,64 @@ export default function TrainPage() {
         [5, 9], [9, 13], [13, 17]
     ];
 
-    // Draw skeleton using MediaPipe's official DrawingUtils
+    // Draw skeleton using canvas API (MediaPipe's DrawingUtils.drawConnectors doesn't work well in JS)
     const drawSkeleton = (data: LandmarksData) => {
         if (!canvasRef.current) return;
 
         const ctx = canvasRef.current.getContext('2d');
         if (!ctx) return;
 
-        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        const width = canvasRef.current.width;
+        const height = canvasRef.current.height;
 
-        const drawingUtils = new DrawingUtils(ctx);
+        ctx.clearRect(0, 0, width, height);
 
-        // Convert to MediaPipe format {x, y, z}
-        const toMPLandmarks = (landmarks: number[][]) => {
-            return landmarks.map(([x, y, z]) => ({ x, y, z: z || 0 }));
+        // Helper to draw hand with connections
+        const drawHand = (hand: number[][], color: string, fillColor: string) => {
+            // Draw connections (bones)
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+
+            HAND_CONNECTIONS.forEach(([start, end]) => {
+                const startPt = hand[start];
+                const endPt = hand[end];
+
+                if (startPt && endPt && startPt[0] !== 0 && startPt[1] !== 0 && endPt[0] !== 0 && endPt[1] !== 0) {
+                    ctx.beginPath();
+                    ctx.moveTo(startPt[0] * width, startPt[1] * height);
+                    ctx.lineTo(endPt[0] * width, endPt[1] * height);
+                    ctx.stroke();
+                }
+            });
+
+            // Draw joints (landmarks)
+            hand.forEach(pt => {
+                if (pt && pt[0] !== 0 && pt[1] !== 0) {
+                    // Outer circle (border)
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.arc(pt[0] * width, pt[1] * height, 5, 0, 2 * Math.PI);
+                    ctx.fill();
+
+                    // Inner circle (fill)
+                    ctx.fillStyle = fillColor;
+                    ctx.beginPath();
+                    ctx.arc(pt[0] * width, pt[1] * height, 3, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+            });
         };
 
         // Use RAW coordinates (0-1 range) for accurate screen drawing
         // Draw left hand (green)
         if (data.rawLeftHand && data.rawLeftHand.some(pt => pt[0] !== 0)) {
-            const leftHandLandmarks = toMPLandmarks(data.rawLeftHand);
-
-            drawingUtils.drawConnectors(
-                leftHandLandmarks,
-                HAND_CONNECTIONS,
-                { color: '#10B981', lineWidth: 4 }
-            );
-
-            drawingUtils.drawLandmarks(
-                leftHandLandmarks,
-                { color: '#10B981', fillColor: '#FFFFFF', radius: 4 }
-            );
+            drawHand(data.rawLeftHand, '#10B981', '#FFFFFF');
         }
 
         // Draw right hand (blue)
         if (data.rawRightHand && data.rawRightHand.some(pt => pt[0] !== 0)) {
-            const rightHandLandmarks = toMPLandmarks(data.rawRightHand);
-
-            drawingUtils.drawConnectors(
-                rightHandLandmarks,
-                HAND_CONNECTIONS,
-                { color: '#3B82F6', lineWidth: 4 }
-            );
-
-            drawingUtils.drawLandmarks(
-                rightHandLandmarks,
-                { color: '#3B82F6', fillColor: '#FFFFFF', radius: 4 }
-            );
+            drawHand(data.rawRightHand, '#3B82F6', '#FFFFFF');
         }
     };
 
