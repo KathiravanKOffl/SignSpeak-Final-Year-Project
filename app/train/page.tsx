@@ -297,9 +297,11 @@ export default function TrainPage() {
     return (
         <>
             <main className="min-h-screen bg-[#F8F9FA] flex flex-col">
-                <div className="p-3 sm:p-4 text-center border-b bg-white">
-                    <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Training - Auto Mode</h1>
-                    <p className="text-slate-500 text-xs">{samplesPerWord} samples per word, auto-capture</p>
+                <div className="p-4 sm:p-5 border-b bg-white">
+                    <div className="max-w-7xl mx-auto">
+                        <h1 className="text-2xl sm:text-3xl font-bold text-slate-800">Training - Auto Mode</h1>
+                        <p className="text-slate-500 text-sm mt-1">{samplesPerWord} samples per word • Auto-capture enabled</p>
+                    </div>
                 </div>
 
                 <div className="flex-1 flex flex-col lg:grid lg:grid-cols-2 gap-3 sm:gap-4 p-3 sm:p-4 max-w-7xl mx-auto w-full">
@@ -372,7 +374,7 @@ export default function TrainPage() {
 
                         {/* Controls */}
                         <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                            {!isRecording && !isCountdown && (
+                            {!isRecording && !isCountdown && !isStarted && (
                                 <button
                                     onClick={() => {
                                         setIsStarted(true);
@@ -383,6 +385,13 @@ export default function TrainPage() {
                                 >
                                     ▶ START
                                 </button>
+                            )}
+
+                            {!isRecording && !isCountdown && isStarted && (
+                                <div className="col-span-2 py-4 sm:py-5 bg-slate-100 text-slate-600 rounded-xl font-bold text-lg sm:text-xl flex items-center justify-center gap-2">
+                                    <div className="w-5 h-5 border-3 border-slate-300 border-t-blue-600 rounded-full animate-spin" />
+                                    Processing...
+                                </div>
                             )}
 
                             {isCountdown && (
