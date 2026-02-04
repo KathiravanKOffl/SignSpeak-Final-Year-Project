@@ -305,11 +305,12 @@ export default function TrainPage() {
     };
 
     const handleNextWord = () => {
-        samples.length = 0; // Clear visible samples locally (store handles reset on nextWord/setWords)
         nextWord();
         setStatus('Ready next word');
         setIsStarted(false);
     };
+
+    const isComplete = samples.length >= samplesPerWord;
 
     return (
         <>
@@ -369,7 +370,7 @@ export default function TrainPage() {
 
                     {/* Right Column: Controls or Completion */}
                     <div className="flex flex-col gap-4">
-                        {samples.length >= samplesPerWord ? (
+                        {isComplete ? (
                             // Completion UI
                             <div className="h-full bg-white rounded-2xl shadow-sm border border-slate-200 p-8 flex flex-col items-center justify-center text-center">
                                 <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6">
