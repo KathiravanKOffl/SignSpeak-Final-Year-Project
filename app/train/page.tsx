@@ -51,6 +51,7 @@ export default function TrainPage() {
         confirmSample,
         retrySample,
         resetWord,
+        nextWord,
         isWordComplete,
         setWordComplete
     } = useTrainingStore();
@@ -320,183 +321,183 @@ export default function TrainPage() {
 
     return (
         <>
-            <main className="min-h-screen bg-[#F8F9FA] flex flex-col">
-                <div className="p-4 sm:p-5 border-b bg-white">
-                    <div className="max-w-7xl mx-auto px-1">
+            <main className="min-h-screen bg-[#F8F9FA] flex flex-col items-center justify-center p-4 sm:p-6">
+                <div className="w-full max-w-7xl mx-auto space-y-4 sm:space-y-6">
+                    <div className="px-1">
                         <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">Training Session</h1>
                     </div>
-                </div>
 
-                <div className="flex-1 flex flex-col lg:grid lg:grid-cols-2 gap-4 p-4 max-w-7xl mx-auto w-full">
+                    <div className="flex flex-col lg:grid lg:grid-cols-2 gap-4 w-full">
 
-                    {/* Camera */}
-                    <div className="relative bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden" style={{ aspectRatio: '4/3' }}>
-                        <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover transform scale-x-[-1]" />
-                        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full transform scale-x-[-1] pointer-events-none" />
+                        {/* Camera */}
+                        <div className="relative bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden" style={{ aspectRatio: '4/3' }}>
+                            <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover transform scale-x-[-1]" />
+                            <canvas ref={canvasRef} className="absolute inset-0 w-full h-full transform scale-x-[-1] pointer-events-none" />
 
-                        {/* Countdown */}
-                        {isCountdown && (
-                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
-                                <motion.div
-                                    key={countdownValue}
-                                    initial={{ scale: 0.5, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    className="text-7xl sm:text-9xl font-bold text-white drop-shadow-2xl"
-                                >
-                                    {countdownValue}
-                                </motion.div>
-                            </div>
-                        )}
-
-                        {/* Recording indicator */}
-                        {isRecording && (
-                            <>
-                                <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1.5 rounded-full text-sm font-bold flex items-center gap-2 z-10 shadow-lg">
-                                    <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                                    REC
+                            {/* Countdown */}
+                            {isCountdown && (
+                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
+                                    <motion.div
+                                        key={countdownValue}
+                                        initial={{ scale: 0.5, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        className="text-7xl sm:text-9xl font-bold text-white drop-shadow-2xl"
+                                    >
+                                        {countdownValue}
+                                    </motion.div>
                                 </div>
-                                <div className="absolute bottom-0 left-0 right-0 h-2 bg-slate-200 z-10">
-                                    <div
-                                        className="h-full bg-red-500 transition-all duration-100 ease-linear shadow-[0_-2px_4px_rgba(239,68,68,0.3)]"
-                                        style={{ width: `${recordingProgress}%` }}
-                                    />
-                                </div>
-                            </>
-                        )}
+                            )}
 
-                        {(isModelLoading || !isCameraActive) && (
-                            <div className="absolute inset-0 bg-white/90 flex items-center justify-center z-20">
-                                <div className="text-center px-4">
-                                    <div className="w-12 h-12 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4" />
-                                    <p className="text-slate-600 font-medium">{status}</p>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Right Column: Controls or Completion */}
-                    <div className="flex flex-col gap-4">
-                        {isWordComplete ? (
-                            // Completion UI
-                            <div className="h-full bg-white rounded-2xl shadow-sm border border-slate-200 p-8 flex flex-col items-center justify-center text-center">
-                                <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6">
-                                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                </div>
-                                <h2 className="text-3xl font-bold text-slate-800 mb-2">Great Job!</h2>
-                                <p className="text-slate-500 mb-8">
-                                    You've collected {samples.length} samples for <span className="font-bold text-slate-800">"{currentWord}"</span>.
-                                    <br />
-                                    Dataset file downloaded automatically.
-                                </p>
-                                <button
-                                    onClick={handleNextWord}
-                                    className="w-full max-w-xs py-4 bg-blue-600 text-white rounded-xl font-bold text-lg hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all hover:scale-[1.02]"
-                                >
-                                    Start Next Word →
-                                </button>
-                                <p className="mt-4 text-xs text-slate-400">
-                                    Next: <span className="font-medium text-slate-600">{vocabulary[currentWordIndex + 1] || 'End of list'}</span>
-                                </p>
-                            </div>
-                        ) : (
-                            // Active Training Controls
-                            <>
-                                <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl shadow-xl p-6 text-white relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-8 -mt-8 blur-2xl" />
-                                    <p className="text-xs uppercase tracking-wider mb-1 opacity-80 font-medium">Target Word</p>
-                                    <h2 className="text-5xl font-bold mb-4 tracking-tight">{currentWord}</h2>
-                                    <div className="flex justify-between text-sm opacity-90 font-medium">
-                                        <span>{samples.length} / {samplesPerWord} samples</span>
-                                        <span>{currentWordIndex + 1} / {vocabulary.length}</span>
+                            {/* Recording indicator */}
+                            {isRecording && (
+                                <>
+                                    <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1.5 rounded-full text-sm font-bold flex items-center gap-2 z-10 shadow-lg">
+                                        <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                                        REC
                                     </div>
-                                </div>
-
-                                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
-                                    <div className="flex justify-between text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-                                        <span>Progress</span>
-                                        <span>{Math.round((samples.length / samplesPerWord) * 100)}%</span>
-                                    </div>
-                                    <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                                        <motion.div
-                                            className="h-full bg-green-500"
-                                            initial={false}
-                                            animate={{ width: `${(samples.length / samplesPerWord) * 100}%` }}
-                                            transition={{ type: "spring", stiffness: 100 }}
+                                    <div className="absolute bottom-0 left-0 right-0 h-2 bg-slate-200 z-10">
+                                        <div
+                                            className="h-full bg-red-500 transition-all duration-100 ease-linear shadow-[0_-2px_4px_rgba(239,68,68,0.3)]"
+                                            style={{ width: `${recordingProgress}%` }}
                                         />
                                     </div>
+                                </>
+                            )}
+
+                            {(isModelLoading || !isCameraActive) && (
+                                <div className="absolute inset-0 bg-white/90 flex items-center justify-center z-20">
+                                    <div className="text-center px-4">
+                                        <div className="w-12 h-12 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4" />
+                                        <p className="text-slate-600 font-medium">{status}</p>
+                                    </div>
                                 </div>
+                            )}
+                        </div>
 
-                                {/* Action Buttons */}
-                                <div className="grid grid-cols-2 gap-3">
-                                    {!isRecording && !isCountdown && !isStarted && (
-                                        <button
-                                            onClick={() => {
-                                                setIsStarted(true);
-                                                startCountdown();
-                                            }}
-                                            disabled={!isCameraActive || isModelLoading}
-                                            className="col-span-2 py-5 bg-blue-600 text-white rounded-xl font-bold text-xl hover:bg-blue-700 disabled:opacity-50 shadow-lg shadow-blue-200 transition-all active:scale-[0.98]"
-                                        >
-                                            ▶ START SESSION
-                                        </button>
-                                    )}
-
-                                    {!isRecording && !isCountdown && isStarted && (
-                                        <div className="col-span-2 py-5 bg-slate-50 border-2 border-slate-100 text-slate-500 rounded-xl font-bold text-lg flex items-center justify-center gap-3">
-                                            <div className="w-5 h-5 border-3 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
-                                            Processing...
+                        {/* Right Column: Controls or Completion */}
+                        <div className="flex flex-col gap-4">
+                            {isWordComplete ? (
+                                // Completion UI
+                                <div className="h-full bg-white rounded-2xl shadow-sm border border-slate-200 p-8 flex flex-col items-center justify-center text-center">
+                                    <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6">
+                                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </div>
+                                    <h2 className="text-3xl font-bold text-slate-800 mb-2">Great Job!</h2>
+                                    <p className="text-slate-500 mb-8">
+                                        You've collected {samples.length} samples for <span className="font-bold text-slate-800">"{currentWord}"</span>.
+                                        <br />
+                                        Dataset file downloaded automatically.
+                                    </p>
+                                    <button
+                                        onClick={handleNextWord}
+                                        className="w-full max-w-xs py-4 bg-blue-600 text-white rounded-xl font-bold text-lg hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all hover:scale-[1.02]"
+                                    >
+                                        Start Next Word →
+                                    </button>
+                                    <p className="mt-4 text-xs text-slate-400">
+                                        Next: <span className="font-medium text-slate-600">{vocabulary[currentWordIndex + 1] || 'End of list'}</span>
+                                    </p>
+                                </div>
+                            ) : (
+                                // Active Training Controls
+                                <>
+                                    <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl shadow-xl p-6 text-white relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-8 -mt-8 blur-2xl" />
+                                        <p className="text-xs uppercase tracking-wider mb-1 opacity-80 font-medium">Target Word</p>
+                                        <h2 className="text-5xl font-bold mb-4 tracking-tight">{currentWord}</h2>
+                                        <div className="flex justify-between text-sm opacity-90 font-medium">
+                                            <span>{samples.length} / {samplesPerWord} samples</span>
+                                            <span>{currentWordIndex + 1} / {vocabulary.length}</span>
                                         </div>
-                                    )}
+                                    </div>
 
-                                    {isCountdown && (
-                                        <>
+                                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                                        <div className="flex justify-between text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+                                            <span>Progress</span>
+                                            <span>{Math.round((samples.length / samplesPerWord) * 100)}%</span>
+                                        </div>
+                                        <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                                            <motion.div
+                                                className="h-full bg-green-500"
+                                                initial={false}
+                                                animate={{ width: `${(samples.length / samplesPerWord) * 100}%` }}
+                                                transition={{ type: "spring", stiffness: 100 }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {!isRecording && !isCountdown && !isStarted && (
                                             <button
-                                                onClick={isPaused ? resumeTraining : pauseTraining}
-                                                className="py-4 bg-amber-400 text-white rounded-xl font-bold text-lg hover:bg-amber-500 shadow-md transition-colors"
+                                                onClick={() => {
+                                                    setIsStarted(true);
+                                                    startCountdown();
+                                                }}
+                                                disabled={!isCameraActive || isModelLoading}
+                                                className="col-span-2 py-5 bg-blue-600 text-white rounded-xl font-bold text-xl hover:bg-blue-700 disabled:opacity-50 shadow-lg shadow-blue-200 transition-all active:scale-[0.98]"
                                             >
-                                                {isPaused ? '▶ RESUME' : '⏸ PAUSE'}
+                                                ▶ START SESSION
                                             </button>
-                                            {isPaused ? (
-                                                <button
-                                                    onClick={() => {
-                                                        retrySample();
-                                                        handleCancel();
-                                                    }}
-                                                    className="py-4 bg-rose-500 text-white rounded-xl font-bold text-lg hover:bg-rose-600 shadow-md transition-colors"
-                                                >
-                                                    ↺ RETRY
-                                                </button>
-                                            ) : (
-                                                <button
-                                                    onClick={handleCancel}
-                                                    className="py-4 bg-slate-200 text-slate-600 rounded-xl font-bold text-lg hover:bg-slate-300 transition-colors"
-                                                >
-                                                    ✕ CANCEL
-                                                </button>
-                                            )}
-                                        </>
-                                    )}
-                                </div>
+                                        )}
 
-                                {/* Helper Actions */}
-                                <div className="grid grid-cols-2 gap-3 mt-2">
-                                    <button
-                                        onClick={() => setShowWordChanger(true)}
-                                        className="py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 hover:border-slate-300 transition-all text-sm"
-                                    >
-                                        Change Word
-                                    </button>
-                                    <button
-                                        onClick={resetWord}
-                                        className="py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 hover:border-slate-300 transition-all text-sm"
-                                    >
-                                        Reset Progress
-                                    </button>
-                                </div>
-                            </>
-                        )}
+                                        {!isRecording && !isCountdown && isStarted && (
+                                            <div className="col-span-2 py-5 bg-slate-50 border-2 border-slate-100 text-slate-500 rounded-xl font-bold text-lg flex items-center justify-center gap-3">
+                                                <div className="w-5 h-5 border-3 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
+                                                Processing...
+                                            </div>
+                                        )}
+
+                                        {isCountdown && (
+                                            <>
+                                                <button
+                                                    onClick={isPaused ? resumeTraining : pauseTraining}
+                                                    className="py-4 bg-amber-400 text-white rounded-xl font-bold text-lg hover:bg-amber-500 shadow-md transition-colors"
+                                                >
+                                                    {isPaused ? '▶ RESUME' : '⏸ PAUSE'}
+                                                </button>
+                                                {isPaused ? (
+                                                    <button
+                                                        onClick={() => {
+                                                            retrySample();
+                                                            handleCancel();
+                                                        }}
+                                                        className="py-4 bg-rose-500 text-white rounded-xl font-bold text-lg hover:bg-rose-600 shadow-md transition-colors"
+                                                    >
+                                                        ↺ RETRY
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={handleCancel}
+                                                        className="py-4 bg-slate-200 text-slate-600 rounded-xl font-bold text-lg hover:bg-slate-300 transition-colors"
+                                                    >
+                                                        ✕ CANCEL
+                                                    </button>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+
+                                    {/* Helper Actions */}
+                                    <div className="grid grid-cols-2 gap-3 mt-2">
+                                        <button
+                                            onClick={() => setShowWordChanger(true)}
+                                            className="py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 hover:border-slate-300 transition-all text-sm"
+                                        >
+                                            Change Word
+                                        </button>
+                                        <button
+                                            onClick={resetWord}
+                                            className="py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 hover:border-slate-300 transition-all text-sm"
+                                        >
+                                            Reset Progress
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
                 </div>
             </main>
