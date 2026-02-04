@@ -26,8 +26,7 @@ import matplotlib.pyplot as plt
 # ============================================================================
 # CONFIGURATION - REPLACE THIS WITH YOUR DATASET SLUG
 # ============================================================================
-DATASET_PATH = "/kaggle/input/signspeak-training-data"  # Replace with your dataset slug
-# Example: "/kaggle/input/yourusername-signspeak-training-data"
+DATASET_PATH = "/kaggle/input/manual-isl-cache"  
 
 # Training hyperparameters
 BATCH_SIZE = 32
@@ -377,18 +376,20 @@ print("✓ Vocabulary saved to: vocabulary.json")
 # Export to ONNX for browser deployment
 print("\nExporting to ONNX format...")
 model.eval()
-dummy_input = torch.randn(1, SEQUENCE_LENGTH, input_size).to(device)
+model.cpu()  # Move to CPU for export
+dummy_input = torch.randn(1, SEQUENCE_LENGTH, input_size)
 
 torch.onnx.export(
     model,
     dummy_input,
     "sign_model.onnx",
     export_params=True,
-    opset_version=11,
+    opset_version=13,  # More compatible with onnxruntime-web
     do_constant_folding=True,
     input_names=['input'],
     output_names=['output'],
-    dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}}
+    dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}},
+    verbose=False
 )
 
 print("✓ ONNX model saved to: sign_model.onnx")

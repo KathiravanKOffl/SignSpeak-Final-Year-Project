@@ -12,7 +12,7 @@ interface InferenceHook {
 }
 
 const SEQUENCE_LENGTH = 32; // Fixed sequence length for LSTM
-const VOCABULARY = ['he', 'i', 'you']; // Update this when you add more words
+const VOCABULARY = ['go', 'he', 'home', 'i', 'like', 'you']; // 6 words trained
 
 export function useInference(): InferenceHook {
     const [isLoading, setIsLoading] = useState(true);
