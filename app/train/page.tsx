@@ -20,6 +20,7 @@ export default function TrainPage() {
     const frameBufferRef = useRef<LandmarksData[]>([]);
     const recordingStartRef = useRef<number>(0);
     const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const isProcessingStopRef = useRef(false); // Guard against double-stop
 
     const [isCameraActive, setIsCameraActive] = useState(false);
     const [status, setStatus] = useState<string>('Initializing...');
@@ -59,7 +60,7 @@ export default function TrainPage() {
             drawSkeleton(data);
 
             // Collect frames during recording
-            if (isRecording) {
+            if (isRecording && !isProcessingStopRef.current) {
                 frameBufferRef.current.push(data);
 
                 // Calculate progress (2 seconds = 100%)
@@ -67,11 +68,10 @@ export default function TrainPage() {
                 const progress = Math.min((elapsed / 2000) * 100, 100);
                 setRecordingProgress(progress);
 
-                // Auto-stop after 2 seconds (with small buffer to ensure progress hits 100%)
+                // Auto-stop after 2 seconds
                 if (elapsed >= 2000) {
-                    // Ensure progress shows 100% before stopping
-                    setRecordingProgress(100);
-                    setTimeout(() => handleAutoStop(), 50);
+                    isProcessingStopRef.current = true; // Prevent double-trigger
+                    handleAutoStop();
                 }
             }
         }
@@ -251,18 +251,28 @@ export default function TrainPage() {
     const handleStart = () => {
         frameBufferRef.current = [];
         recordingStartRef.current = Date.now();
+        isProcessingStopRef.current = false; // Reset guard
         setIsStarted(true); // Enable auto mode
         startRecording();
         setStatus('Recording...');
     };
 
     const handleAutoStop = () => {
+        if (!isProcessingStopRef.current) return; // Already processed
+
         stopRecording();
+        setRecordingProgress(100); // Force 100% display
+
         const normalized = resampleToN(frameBufferRef.current, 32);
 
-        // Auto-confirm - immediately save and continue
+        // Auto-confirm - immediately save and continue  
         confirmSample(normalized);
         setStatus(`Sample ${samples.length + 1}/${samplesPerWord} saved`);
+
+        // Reset guard for next recording
+        setTimeout(() => {
+            isProcessingStopRef.current = false;
+        }, 100);
     };
 
     const handleCancel = () => {
@@ -321,7 +331,10 @@ export default function TrainPage() {
                                     REC ({Math.ceil((100 - recordingProgress) / 50)}s)
                                 </div>
                                 <div className="absolute bottom-0 left-0 right-0 h-1.5 sm:h-2 bg-slate-200 z-10">
-                                    <motion.div className="h-full bg-red-500" animate={{ width: `${recordingProgress}%` }} />
+                                    <div
+                                        className="h-full bg-red-500 transition-all duration-100 ease-linear"
+                                        style={{ width: `${recordingProgress}%` }}
+                                    />
                                 </div>
                             </>
                         )}
