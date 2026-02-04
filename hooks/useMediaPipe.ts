@@ -9,8 +9,10 @@ export interface LandmarksData {
     rightHand: number[][];
     face: number[][];
     // Raw coordinates (0-1 range) for drawing on screen
+    rawPose: number[][];
     rawLeftHand: number[][];
     rawRightHand: number[][];
+    rawFace: number[][];
     confidence: number;
     timestamp: number;
 }
@@ -158,8 +160,10 @@ export function useMediaPipe(options: UseMediaPipeOptions = {}) {
                     rightHand,
                     face,
                     // Keep raw coordinates for drawing (before normalization)
+                    rawPose: pose.map(pt => [...pt]),
                     rawLeftHand: leftHand.map(pt => [...pt]),
                     rawRightHand: rightHand.map(pt => [...pt]),
+                    rawFace: face.map(pt => [...pt]),
                     confidence,
                     timestamp,
                 };

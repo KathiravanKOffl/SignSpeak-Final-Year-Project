@@ -107,6 +107,22 @@ export default function TrainPage() {
         frameId = requestAnimationFrame(loop);
         return () => cancelAnimationFrame(frameId);
     }, [isCameraActive, isModelLoading, processFrame]);
+    // MediaPipe pose connections
+    const POSE_CONNECTIONS = [
+        // Torso
+        [11, 12], [11, 23], [12, 24], [23, 24],
+        // Left arm
+        [11, 13], [13, 15], [15, 17], [15, 19], [15, 21], [17, 19],
+        // Right arm  
+        [12, 14], [14, 16], [16, 18], [16, 20], [16, 22], [18, 20],
+        // Face
+        [0, 1], [1, 2], [2, 3], [3, 7], [0, 4], [4, 5], [5, 6], [6, 8],
+        // Left leg
+        [23, 25], [25, 27], [27, 29], [27, 31], [29, 31],
+        // Right leg
+        [24, 26], [26, 28], [28, 30], [28, 32], [30, 32]
+    ];
+
     // MediaPipe hand connections
     const HAND_CONNECTIONS = [
         [0, 1], [1, 2], [2, 3], [3, 4],
@@ -117,7 +133,7 @@ export default function TrainPage() {
         [5, 9], [9, 13], [13, 17]
     ];
 
-    // Draw skeleton using canvas API (MediaPipe's DrawingUtils.drawConnectors doesn't work well in JS)
+    // Draw skeleton using canvas API
     const drawSkeleton = (data: LandmarksData) => {
         if (!canvasRef.current) return;
 
@@ -128,6 +144,40 @@ export default function TrainPage() {
         const height = canvasRef.current.height;
 
         ctx.clearRect(0, 0, width, height);
+
+        // Helper to draw pose body
+        const drawPose = (pose: number[][], color: string) => {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+
+            POSE_CONNECTIONS.forEach(([start, end]) => {
+                const startPt = pose[start];
+                const endPt = pose[end];
+
+                if (startPt && endPt && startPt[0] !== 0 && startPt[1] !== 0 && endPt[0] !== 0 && endPt[1] !== 0) {
+                    ctx.beginPath();
+                    ctx.moveTo(startPt[0] * width, startPt[1] * height);
+                    ctx.lineTo(endPt[0] * width, endPt[1] * height);
+                    ctx.stroke();
+                }
+            });
+
+            // Draw joints
+            pose.forEach(pt => {
+                if (pt && pt[0] !== 0 && pt[1] !== 0) {
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.arc(pt[0] * width, pt[1] * height, 6, 0, 2 * Math.PI);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.beginPath();
+                    ctx.arc(pt[0] * width, pt[1] * height, 3, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+            });
+        };
 
         // Helper to draw hand with connections
         const drawHand = (hand: number[][], color: string, fillColor: string) => {
@@ -166,7 +216,29 @@ export default function TrainPage() {
             });
         };
 
+        // Helper to draw face landmarks
+        const drawFace = (face: number[][], color: string) => {
+            face.forEach(pt => {
+                if (pt && pt[0] !== 0 && pt[1] !== 0) {
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.arc(pt[0] * width, pt[1] * height, 2, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+            });
+        };
+
         // Use RAW coordinates (0-1 range) for accurate screen drawing
+        // Draw body pose (purple/magenta)
+        if (data.rawPose && data.rawPose.some(pt => pt[0] !== 0)) {
+            drawPose(data.rawPose, '#A855F7');
+        }
+
+        // Draw face (yellow)
+        if (data.rawFace && data.rawFace.some(pt => pt[0] !== 0)) {
+            drawFace(data.rawFace, '#EAB308');
+        }
+
         // Draw left hand (green)
         if (data.rawLeftHand && data.rawLeftHand.some(pt => pt[0] !== 0)) {
             drawHand(data.rawLeftHand, '#10B981', '#FFFFFF');
