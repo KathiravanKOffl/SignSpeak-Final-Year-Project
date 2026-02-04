@@ -1,174 +1,198 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useMediaPipe, LandmarksData } from '@/hooks/useMediaPipe';
+import { useState, useRef, useEffect } from 'react';
 import { useInference } from '@/hooks/useInference';
-import { useChatStore } from '@/stores/chatStore';
+import { useMediaPipe } from '@/hooks/useMediaPipe';
 
 export default function CameraPanel() {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isCameraActive, setIsCameraActive] = useState(false);
-    const { addMessage } = useChatStore();
-    const { predict, isLoading: isPredicting, getBufferSize, BUFFER_SIZE } = useInference();
-    const lastPredictionRef = useRef<string | null>(null);
+    const [isDetecting, setIsDetecting] = useState(false);
+    const [sentence, setSentence] = useState<string[]>([]);
+    const [lastPrediction, setLastPrediction] = useState<string | null>(null);
+    const lastWordTimeRef = useRef<number>(0);
 
-    // Handle landmarks from MediaPipe
-    const handleLandmarks = async (data: LandmarksData) => {
-        // 1. Draw Skeleton
-        if (canvasRef.current && videoRef.current) {
-            const ctx = canvasRef.current.getContext('2d');
-            if (ctx) {
-                ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    const { predict, isLoading: modelLoading, resetBuffer } = useInference();
 
-                // Draw hands (Professional Green)
-                ctx.fillStyle = '#10B981'; // Emerald-500
-                [...data.leftHand, ...data.rightHand].forEach(pt => {
-                    // Ensure visibility (some landmarks might be zero if not detected)
-                    if (pt[0] !== 0 && pt[1] !== 0) {
-                        ctx.beginPath();
-                        ctx.arc(pt[0] * canvasRef.current!.width, pt[1] * canvasRef.current!.height, 3, 0, 2 * Math.PI);
-                        ctx.fill();
-                    }
-                });
-            }
-        }
+    const { processFrame, isLoading: mediaPipeLoading } = useMediaPipe({
+        onLandmarks: async (data) => {
+            if (!isDetecting) return;
 
-        // 2. Inference Logic
-        const hasHands = data.leftHand.some(p => p[0] !== 0) || data.rightHand.some(p => p[0] !== 0);
-        if (!hasHands) return;
+            // Run inference
+            const prediction = await predict(data);
 
-        try {
-            const result = await predict(data, 'isl');
-            if (result && result.gloss) {
-                // Debounce: only add if different from last recent prediction or sufficient time passed
-                // For now, strict change detection to avoid spam
-                if (result.gloss !== lastPredictionRef.current && result.confidence > 0.6) {
-                    console.log(`[Signer] Predicted: ${result.gloss} (${result.confidence})`);
-                    addMessage('signer', result.gloss);
-                    lastPredictionRef.current = result.gloss;
-
-                    // Reset debounce after 2 seconds
-                    setTimeout(() => { lastPredictionRef.current = null; }, 2000);
+            if (prediction) {
+                // Debounce: only add word if 2 seconds passed since last word
+                const now = Date.now();
+                if (now - lastWordTimeRef.current > 2000) {
+                    setSentence(prev => [...prev, prediction]);
+                    setLastPrediction(prediction);
+                    lastWordTimeRef.current = now;
                 }
             }
-        } catch (err) {
-            console.error("Prediction error:", err);
         }
-    };
-
-    // Initialize MediaPipe
-    const { processFrame, isLoading: isModelLoading } = useMediaPipe({
-        onLandmarks: handleLandmarks,
     });
 
-    // Start Camera
+    // Initialize camera
     useEffect(() => {
-        let stream: MediaStream | null = null;
-
         const startCamera = async () => {
             try {
-                stream = await navigator.mediaDevices.getUserMedia({
+                const stream = await navigator.mediaDevices.getUserMedia({
                     video: { width: 640, height: 480, facingMode: 'user' }
                 });
+
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
                     videoRef.current.onloadeddata = () => {
                         setIsCameraActive(true);
-                        if (videoRef.current && canvasRef.current) {
-                            canvasRef.current.width = videoRef.current.videoWidth;
-                            canvasRef.current.height = videoRef.current.videoHeight;
-                        }
                     };
                 }
             } catch (err) {
-                console.error("Camera failed:", err);
+                console.error('Camera error:', err);
             }
         };
 
         startCamera();
 
         return () => {
-            stream?.getTracks().forEach(t => t.stop());
+            if (videoRef.current?.srcObject) {
+                const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+                tracks.forEach(track => track.stop());
+            }
         };
     }, []);
 
-    // Frame Loop
+    // Process video frames
     useEffect(() => {
-        if (!isCameraActive || isModelLoading) return;
+        if (!isCameraActive || !videoRef.current || !canvasRef.current) return;
 
-        let frameId: number;
-        const loop = (timestamp: number) => {
-            if (videoRef.current && videoRef.current.readyState >= 2) {
-                processFrame(videoRef.current, timestamp);
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        let animationId: number;
+        const processVideoFrame = async () => {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                await processFrame(video);
             }
-            frameId = requestAnimationFrame(loop);
+            animationId = requestAnimationFrame(processVideoFrame);
         };
-        frameId = requestAnimationFrame(loop);
-        return () => cancelAnimationFrame(frameId);
-    }, [isCameraActive, isModelLoading, processFrame]);
+
+        processVideoFrame();
+
+        return () => {
+            if (animationId) cancelAnimationFrame(animationId);
+        };
+    }, [isCameraActive, processFrame]);
+
+    const handleStart = () => {
+        setIsDetecting(true);
+        resetBuffer();
+        setSentence([]);
+    };
+
+    const handleStop = () => {
+        setIsDetecting(false);
+
+        // Speak the sentence
+        if (sentence.length > 0) {
+            const text = sentence.join(' ');
+            const utterance = new SpeechSynthesisUtterance(text);
+            speechSynthesis.speak(utterance);
+        }
+    };
+
+    const handleClear = () => {
+        setSentence([]);
+        setLastPrediction(null);
+        resetBuffer();
+    };
 
     return (
-        <div className="flex flex-col h-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="h-full bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                <h2 className="font-semibold text-slate-700 flex items-center gap-2">
-                    <div className={`w-2.5 h-2.5 rounded-full ${isCameraActive ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'}`} />
-                    Signer Input
-                </h2>
-                <div className="text-xs font-medium text-slate-400 uppercase tracking-wider">User 1</div>
+            <div className="p-6 border-b border-slate-200">
+                <h2 className="text-xl font-bold text-slate-800">Sign Input</h2>
+                <p className="text-sm text-slate-500 mt-1">Perform signs to build your sentence</p>
             </div>
 
-            {/* Video Container */}
-            <div className="flex-1 relative bg-slate-100 overflow-hidden flex items-center justify-center group">
-                <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="absolute inset-0 w-full h-full object-cover transform scale-x-[-1]"
-                />
-                <canvas
-                    ref={canvasRef}
-                    className="absolute inset-0 w-full h-full transform scale-x-[-1] pointer-events-none opacity-60"
-                />
+            {/* Video & Sentence Display */}
+            <div className="flex-1 p-6 flex flex-col gap-4 overflow-auto">
+                {/* Camera Feed */}
+                <div className="relative bg-slate-900 rounded-xl overflow-hidden" style={{ aspectRatio: '4/3' }}>
+                    <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className="absolute inset-0 w-full h-full object-cover transform scale-x-[-1]"
+                    />
+                    <canvas
+                        ref={canvasRef}
+                        className="absolute inset-0 w-full h-full transform scale-x-[-1] pointer-events-none"
+                    />
 
-                {/* Loading State */}
-                {(isModelLoading || !isCameraActive) && (
-                    <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
-                        <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin mb-4" />
-                        <p className="text-slate-500 text-sm font-medium">Initializing Vision Engine...</p>
+                    {/* Status Indicator */}
+                    <div className="absolute top-4 right-4 px-3 py-2 rounded-lg bg-black/60 backdrop-blur-sm">
+                        {modelLoading || mediaPipeLoading ? (
+                            <span className="text-yellow-400 text-sm font-medium">⏳ Loading...</span>
+                        ) : isDetecting ? (
+                            <span className="text-green-400 text-sm font-medium flex items-center gap-2">
+                                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                                Detecting
+                            </span>
+                        ) : (
+                            <span className="text-slate-300 text-sm font-medium">● Standby</span>
+                        )}
                     </div>
-                )}
 
-                {/* Inference Indicator */}
-                {isPredicting && (
-                    <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded-full font-medium">
-                        PROCESSING
-                    </div>
-                )}
-
-                {/* Controls Overlay (Bottom) */}
-                <div className="absolute bottom-6 left-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div className="bg-white/90 backdrop-blur-md rounded-xl p-4 shadow-lg border border-white/20">
-                        <div className="flex justify-between text-xs text-slate-500 mb-2">
-                            <span>Confidence Threshold</span>
-                            <span>{(getBufferSize() / BUFFER_SIZE * 100).toFixed(0)}%</span>
+                    {/* Last Prediction */}
+                    {lastPrediction && isDetecting && (
+                        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-lg shadow-lg animate-pulse">
+                            "{lastPrediction}"
                         </div>
-                        <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-blue-500 transition-all duration-300 ease-out"
-                                style={{ width: `${(getBufferSize() / BUFFER_SIZE) * 100}%` }}
-                            />
-                        </div>
-                    </div>
+                    )}
+                </div>
+
+                {/* Sentence Display */}
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 min-h-[80px]">
+                    <p className="text-xs text-slate-500 font-medium mb-2">SENTENCE:</p>
+                    <p className="text-lg font-medium text-slate-800">
+                        {sentence.length > 0 ? sentence.join(' ') : 'Start signing to build your sentence...'}
+                    </p>
                 </div>
             </div>
 
-            {/* Footer info */}
-            <div className="px-6 py-3 bg-white border-t border-slate-100 text-[11px] text-slate-400 flex justify-between">
-                <span>ISL Model v3 (123 Classes)</span>
-                <span>Running on MediaPipe</span>
+            {/* Controls */}
+            <div className="p-6 border-t border-slate-200 bg-slate-50">
+                <div className="grid grid-cols-2 gap-3">
+                    {!isDetecting ? (
+                        <button
+                            onClick={handleStart}
+                            disabled={modelLoading || mediaPipeLoading}
+                            className="col-span-2 py-4 bg-blue-600 text-white rounded-xl font-bold text-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-200"
+                        >
+                            ▶ START DETECTION
+                        </button>
+                    ) : (
+                        <>
+                            <button
+                                onClick={handleStop}
+                                className="py-4 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all"
+                            >
+                                ■ STOP & SPEAK
+                            </button>
+                            <button
+                                onClick={handleClear}
+                                className="py-4 bg-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-300 transition-all"
+                            >
+                                🗑️ CLEAR
+                            </button>
+                        </>
+                    )}
+                </div>
             </div>
         </div>
     );
