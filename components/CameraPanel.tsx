@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useInference } from '@/hooks/useInference';
 import { useMediaPipe } from '@/hooks/useMediaPipe';
 
@@ -12,26 +12,34 @@ export default function CameraPanel() {
     const [sentence, setSentence] = useState<string[]>([]);
     const [lastPrediction, setLastPrediction] = useState<string | null>(null);
     const lastWordTimeRef = useRef<number>(0);
+    const isDetectingRef = useRef(false);
 
-    const { predict, isLoading: modelLoading, resetBuffer } = useInference();
+    const { predict, isLoading: modelLoading, resetBuffer, error: modelError } = useInference();
 
-    const { processFrame, isLoading: mediaPipeLoading } = useMediaPipe({
-        onLandmarks: async (data) => {
-            if (!isDetecting) return;
+    // Update ref when state changes
+    useEffect(() => {
+        isDetectingRef.current = isDetecting;
+    }, [isDetecting]);
 
-            // Run inference
-            const prediction = await predict(data);
+    const handleLandmarks = useCallback(async (data: any) => {
+        if (!isDetectingRef.current) return;
 
-            if (prediction) {
-                // Debounce: only add word if 2 seconds passed since last word
-                const now = Date.now();
-                if (now - lastWordTimeRef.current > 2000) {
-                    setSentence(prev => [...prev, prediction]);
-                    setLastPrediction(prediction);
-                    lastWordTimeRef.current = now;
-                }
+        // Run inference
+        const prediction = await predict(data);
+
+        if (prediction) {
+            // Debounce: only add word if 2 seconds passed since last word
+            const now = Date.now();
+            if (now - lastWordTimeRef.current > 2000) {
+                setSentence(prev => [...prev, prediction]);
+                setLastPrediction(prediction);
+                lastWordTimeRef.current = now;
             }
         }
+    }, [predict]);
+
+    const { processFrame, isLoading: mediaPipeLoading, error: mediaPipeError } = useMediaPipe({
+        onLandmarks: handleLandmarks
     });
 
     // Initialize camera
@@ -75,7 +83,8 @@ export default function CameraPanel() {
         let animationId: number;
         const processVideoFrame = async () => {
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                await processFrame(video);
+                // Pass timestamp as required by useMediaPipe
+                await processFrame(video, performance.now());
             }
             animationId = requestAnimationFrame(processVideoFrame);
         };
@@ -91,6 +100,7 @@ export default function CameraPanel() {
         setIsDetecting(true);
         resetBuffer();
         setSentence([]);
+        setLastPrediction(null);
     };
 
     const handleStop = () => {
@@ -109,6 +119,9 @@ export default function CameraPanel() {
         setLastPrediction(null);
         resetBuffer();
     };
+
+    const isLoading = modelLoading || mediaPipeLoading;
+    const error = modelError || mediaPipeError;
 
     return (
         <div className="h-full bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
@@ -136,8 +149,10 @@ export default function CameraPanel() {
 
                     {/* Status Indicator */}
                     <div className="absolute top-4 right-4 px-3 py-2 rounded-lg bg-black/60 backdrop-blur-sm">
-                        {modelLoading || mediaPipeLoading ? (
+                        {isLoading ? (
                             <span className="text-yellow-400 text-sm font-medium">⏳ Loading...</span>
+                        ) : error ? (
+                            <span className="text-red-400 text-sm font-medium">⚠️ Error</span>
                         ) : isDetecting ? (
                             <span className="text-green-400 text-sm font-medium flex items-center gap-2">
                                 <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
@@ -156,6 +171,13 @@ export default function CameraPanel() {
                     )}
                 </div>
 
+                {/* Error Display */}
+                {error && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
+                        {error}
+                    </div>
+                )}
+
                 {/* Sentence Display */}
                 <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 min-h-[80px]">
                     <p className="text-xs text-slate-500 font-medium mb-2">SENTENCE:</p>
@@ -171,10 +193,10 @@ export default function CameraPanel() {
                     {!isDetecting ? (
                         <button
                             onClick={handleStart}
-                            disabled={modelLoading || mediaPipeLoading}
+                            disabled={isLoading}
                             className="col-span-2 py-4 bg-blue-600 text-white rounded-xl font-bold text-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-200"
                         >
-                            ▶ START DETECTION
+                            {isLoading ? '⏳ Loading Model...' : '▶ START DETECTION'}
                         </button>
                     ) : (
                         <>
