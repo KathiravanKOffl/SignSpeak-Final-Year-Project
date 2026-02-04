@@ -319,6 +319,22 @@ export default function TrainPage() {
         setIsStarted(false);
     };
 
+    const handleRetry = () => {
+        // Clear the frame buffer completely
+        frameBufferRef.current = [];
+        isProcessingStopRef.current = false;
+
+        // Reset countdown/recording state
+        retrySample();
+        setIsCountdown(false);
+        setIsStarted(false);
+        if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+        }
+        setStatus('Ready to retry');
+    };
+
+
     return (
         <>
             <main className="min-h-screen bg-[#F8F9FA] flex flex-col items-center justify-center p-4 sm:p-6">
@@ -377,25 +393,45 @@ export default function TrainPage() {
                         {/* Right Column: Controls or Completion */}
                         <div className="flex flex-col gap-4">
                             {isWordComplete ? (
-                                // Completion UI
-                                <div className="h-full bg-white rounded-2xl shadow-sm border border-slate-200 p-8 flex flex-col items-center justify-center text-center">
-                                    <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6">
-                                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                // Completion UI - Match camera height
+                                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col items-center justify-center text-center" style={{ aspectRatio: '4/3' }}>
+                                    <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4">
+                                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                                         </svg>
                                     </div>
-                                    <h2 className="text-3xl font-bold text-slate-800 mb-2">Great Job!</h2>
-                                    <p className="text-slate-500 mb-8">
-                                        You've collected {samples.length} samples for <span className="font-bold text-slate-800">"{currentWord}"</span>.
+                                    <h2 className="text-2xl font-bold text-slate-800 mb-2">Great Job!</h2>
+                                    <p className="text-slate-500 text-sm mb-6">
+                                        Collected {samples.length} samples for <span className="font-bold text-slate-800">"{currentWord}"</span>.
                                         <br />
-                                        Dataset file downloaded automatically.
+                                        Dataset downloaded automatically.
                                     </p>
-                                    <button
-                                        onClick={handleNextWord}
-                                        className="w-full max-w-xs py-4 bg-blue-600 text-white rounded-xl font-bold text-lg hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all hover:scale-[1.02]"
-                                    >
-                                        Start Next Word →
-                                    </button>
+                                    <div className="flex flex-col gap-2 w-full max-w-xs">
+                                        <button
+                                            onClick={handleNextWord}
+                                            className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all"
+                                        >
+                                            Start Next Word →
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setWordComplete(false);
+                                                setShowWordChanger(true);
+                                            }}
+                                            className="w-full py-2.5 bg-slate-100 text-slate-600 rounded-xl font-medium hover:bg-slate-200 transition-all"
+                                        >
+                                            Choose Different Word
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setWordComplete(false);
+                                                setIsStarted(false);
+                                            }}
+                                            className="w-full py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 transition-all"
+                                        >
+                                            Back to Start
+                                        </button>
+                                    </div>
                                     <p className="mt-4 text-xs text-slate-400">
                                         Next: <span className="font-medium text-slate-600">{vocabulary[currentWordIndex + 1] || 'End of list'}</span>
                                     </p>
@@ -460,10 +496,7 @@ export default function TrainPage() {
                                                 </button>
                                                 {isPaused ? (
                                                     <button
-                                                        onClick={() => {
-                                                            retrySample();
-                                                            handleCancel();
-                                                        }}
+                                                        onClick={handleRetry}
                                                         className="py-4 bg-rose-500 text-white rounded-xl font-bold text-lg hover:bg-rose-600 shadow-md transition-colors"
                                                     >
                                                         ↺ RETRY
