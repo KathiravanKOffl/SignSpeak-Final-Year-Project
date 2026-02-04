@@ -30,7 +30,10 @@ interface TrainingState {
     currentWordIndex: number;
     vocabulary: string[];
     samplesPerWord: number;
-    isAutoMode: boolean;
+
+    // Word selection
+    selectedWords: string[];
+    isWordSelectionOpen: boolean;
 
     // Collection state
     samples: TrainingSample[];
@@ -48,7 +51,8 @@ interface TrainingState {
 
     // Actions
     setCurrentWord: (word: string, index: number) => void;
-    setAutoMode: (auto: boolean) => void;
+    setSelectedWords: (words: string[]) => void;
+    setWordSelectionOpen: (open: boolean) => void;
     startCountdown: () => void;
     startRecording: () => void;
     stopRecording: () => void;
@@ -70,7 +74,8 @@ export const useTrainingStore = create<TrainingState>((set, get) => ({
     currentWordIndex: 0,
     vocabulary: FULL_VOCABULARY,
     samplesPerWord: 40,
-    isAutoMode: false,
+    selectedWords: FULL_VOCABULARY, // All words by default
+    isWordSelectionOpen: false,
     samples: [],
     isRecording: false,
     recordingProgress: 0,
@@ -86,7 +91,15 @@ export const useTrainingStore = create<TrainingState>((set, get) => ({
         currentWordIndex: index
     }),
 
-    setAutoMode: (auto) => set({ isAutoMode: auto }),
+    setSelectedWords: (words) => set({
+        selectedWords: words,
+        vocabulary: words,
+        currentWord: words[0],
+        currentWordIndex: 0,
+        samples: []
+    }),
+
+    setWordSelectionOpen: (open) => set({ isWordSelectionOpen: open }),
 
     setCountdownValue: (value) => set({ countdownValue: value }),
 
