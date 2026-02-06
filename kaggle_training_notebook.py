@@ -373,33 +373,22 @@ torch.save({
 print("✓ Model saved to: sign_model.pth")
 print("✓ Vocabulary saved to: vocabulary.json")
 
-# Export to ONNX for browser deployment
-print("\nExporting to ONNX format...")
-model.eval()
-model.cpu()  # Move to CPU for export
-dummy_input = torch.randn(1, SEQUENCE_LENGTH, input_size)
-
-torch.onnx.export(
-    model,
-    dummy_input,
-    "sign_model.onnx",
-    export_params=True,
-    opset_version=13,  # More compatible with onnxruntime-web
-    do_constant_folding=True,
-    input_names=['input'],
-    output_names=['output'],
-    dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}},
-    verbose=False
-)
-
-print("✓ ONNX model saved to: sign_model.onnx")
-
 print("\n📥 Download these files:")
-print("   1. sign_model.onnx (for browser deployment) ⭐ USE THIS")
-print("   2. sign_model.pth (for PyTorch inference)")
-print("   3. vocabulary.json (list of words)")
-print("   4. training_curves.png (performance visualization)")
+print("   1. sign_model.pth (for PyTorch inference)")
+print("   2. vocabulary.json (list of words)")
+print("   3. training_curves.png (performance visualization)")
+
+print("\n" + "=" * 70)
+print("📤 Upload to Kaggle Models")
+print("=" * 70)
+print("To update your model:")
+print("1. Download sign_model.pth and vocabulary.json from output above")
+print("2. Go to: kaggle.com/models/kathiravankoffl/signspeak-model")
+print("3. Click 'New Version' and upload both files")
+print(f"4. Version notes: Trained on {num_classes} words: {', '.join(vocabulary)}. Val Acc: {max(val_accuracies):.2f}%")
 
 print("\n" + "=" * 70)
 print("🎉 Training Pipeline Complete!")
 print("=" * 70)
+
+

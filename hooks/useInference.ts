@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
-import * as ort from 'onnxruntime-web';
+import { useState, useRef, useCallback } from 'react';
 import type { LandmarksData } from './useMediaPipe';
 
 interface InferenceHook {
@@ -9,147 +8,140 @@ interface InferenceHook {
     isLoading: boolean;
     error: string | null;
     resetBuffer: () => void;
+    vocabulary: string[];
+    isConnected: boolean;
+    testConnection: () => Promise<boolean>;
 }
 
-const SEQUENCE_LENGTH = 32; // Fixed sequence length for LSTM
-const VOCABULARY = ['go', 'he', 'home', 'i', 'like', 'you']; // 6 words trained
+const SEQUENCE_LENGTH = 32;
 
 export function useInference(): InferenceHook {
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [session, setSession] = useState<ort.InferenceSession | null>(null);
+    const [vocabulary, setVocabulary] = useState<string[]>([]);
+    const [isConnected, setIsConnected] = useState(false);
     const frameBuffer = useRef<number[][]>([]);
-    const inputSizeRef = useRef<number>(399); // Will be determined by first frame
 
-    // Load ONNX model
-    useEffect(() => {
-        const loadModel = async () => {
-            try {
-                setIsLoading(true);
-                setError(null);
+    // Get backend URL from localStorage
+    const getBackendUrl = (): string | null => {
+        if (typeof window === 'undefined') return null;
+        return localStorage.getItem('backend_url');
+    };
 
-                // Configure ONNX Runtime for browser
-                ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
-
-                const modelSession = await ort.InferenceSession.create('/models/sign_model.onnx', {
-                    executionProviders: ['wasm'],
-                    graphOptimizationLevel: 'all'
-                });
-
-                setSession(modelSession);
-                setIsLoading(false);
-                console.log('✓ ONNX model loaded successfully');
-            } catch (err) {
-                console.error('Failed to load ONNX model:', err);
-                setError(`Failed to load model: ${err instanceof Error ? err.message : 'Unknown error'}`);
-                setIsLoading(false);
-            }
-        };
-
-        loadModel();
-    }, []);
-
-    // Extract and flatten landmarks to match training format (399 features)
-    const flattenLandmarks = useCallback((landmarks: LandmarksData): number[] => {
+    // Flatten landmarks into feature array (399 features)
+    const flattenLandmarks = (landmarks: LandmarksData): number[] => {
         const features: number[] = [];
 
         // Pose landmarks (33 points × 4 values = 132 features)
-        // Uses pose array with visibility
-        landmarks.pose.forEach(lm => {
-            features.push(...lm);
-        });
+        landmarks.pose.forEach(lm => features.push(...lm));
 
         // Left hand landmarks (21 points × 3 values = 63 features)
-        landmarks.leftHand.forEach(lm => {
-            features.push(...lm);
-        });
+        landmarks.leftHand.forEach(lm => features.push(...lm));
 
         // Right hand landmarks (21 points × 3 values = 63 features)
-        landmarks.rightHand.forEach(lm => {
-            features.push(...lm);
-        });
+        landmarks.rightHand.forEach(lm => features.push(...lm));
 
         // Face landmarks (47 points × 3 values = 141 features)
-        // Training used first 47 face landmarks from essential indices
-        landmarks.face.slice(0, 47).forEach(lm => {
-            features.push(...lm);
-        });
+        landmarks.face.slice(0, 47).forEach(lm => features.push(...lm));
 
         return features;
-    }, []);
+    };
 
-    // Add frame and predict when buffer reaches SEQUENCE_LENGTH
-    const predict = useCallback(async (landmarks: LandmarksData): Promise<string | null> => {
-        if (!session) {
-            return null;
+    // Test connection to backend
+    const testConnection = useCallback(async (): Promise<boolean> => {
+        const backendUrl = getBackendUrl();
+        if (!backendUrl) {
+            setError('No backend URL configured');
+            setIsConnected(false);
+            return false;
         }
 
         try {
-            // Flatten current frame
-            const flatFrame = flattenLandmarks(landmarks);
+            setIsLoading(true);
+            setError(null);
 
-            // Store feature size from first frame
-            if (frameBuffer.current.length === 0) {
-                inputSizeRef.current = flatFrame.length;
-                console.log(`Feature size: ${flatFrame.length}`);
+            const response = await fetch(`${backendUrl}/`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Backend returned ${response.status}`);
             }
 
-            frameBuffer.current.push(flatFrame);
+            const data = await response.json();
 
-            // Wait until we have exactly SEQUENCE_LENGTH frames
-            if (frameBuffer.current.length < SEQUENCE_LENGTH) {
-                return null; // Not enough frames yet
+            if (data.vocabulary && Array.isArray(data.vocabulary)) {
+                setVocabulary(data.vocabulary);
+                setIsConnected(true);
+                console.log('✓ Connected to backend:', data);
+                return true;
+            } else {
+                throw new Error('Invalid response from backend');
+            }
+        } catch (err) {
+            console.error('Connection test failed:', err);
+            setError(`Connection failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            setIsConnected(false);
+            return false;
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    // Predict sign from landmarks
+    const predict = useCallback(async (landmarks: LandmarksData): Promise<string | null> => {
+        const backendUrl = getBackendUrl();
+        if (!backendUrl) {
+            setError('Backend URL not configured');
+            return null;
+        }
+
+        // Add frame to buffer
+        const flatFrame = flattenLandmarks(landmarks);
+        frameBuffer.current.push(flatFrame);
+
+        // Need full sequence
+        if (frameBuffer.current.length < SEQUENCE_LENGTH) {
+            return null;
+        }
+
+        // Keep only last 32 frames
+        while (frameBuffer.current.length > SEQUENCE_LENGTH) {
+            frameBuffer.current.shift();
+        }
+
+        try {
+            setIsLoading(true);
+
+            const response = await fetch(`${backendUrl}/predict`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sequence: frameBuffer.current })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Prediction failed: ${response.status}`);
             }
 
-            // Keep only last SEQUENCE_LENGTH frames (sliding window)
-            while (frameBuffer.current.length > SEQUENCE_LENGTH) {
-                frameBuffer.current.shift();
-            }
+            const result = await response.json();
 
-            // Prepare input tensor: [1, SEQUENCE_LENGTH, feature_size]
-            const featureSize = inputSizeRef.current;
-            const inputData = new Float32Array(frameBuffer.current.flat());
-            const inputTensor = new ort.Tensor('float32', inputData, [1, SEQUENCE_LENGTH, featureSize]);
-
-            // Run inference
-            const feeds = { input: inputTensor };
-            const results = await session.run(feeds);
-            const output = results.output;
-
-            // Get prediction (argmax)
-            const outputData = output.data as Float32Array;
-            let maxIndex = 0;
-            let maxValue = outputData[0];
-
-            for (let i = 1; i < outputData.length; i++) {
-                if (outputData[i] > maxValue) {
-                    maxValue = outputData[i];
-                    maxIndex = i;
-                }
-            }
-
-            // Apply softmax to get proper confidence
-            const expValues = Array.from(outputData).map(v => Math.exp(v));
-            const sumExp = expValues.reduce((a, b) => a + b, 0);
-            const softmaxConfidence = expValues[maxIndex] / sumExp;
-
-            const predictedWord = VOCABULARY[maxIndex];
-
-            console.log(`Predicted: ${predictedWord} (confidence: ${(softmaxConfidence * 100).toFixed(1)}%)`);
-
-            // Only return if confidence is high enough
-            if (softmaxConfidence > 0.6) {
-                return predictedWord;
+            // Return word if confidence is high enough
+            if (result.word && result.confidence > 0.6) {
+                return result.word;
             }
 
             return null;
         } catch (err) {
-            console.error('Inference error:', err);
+            console.error('Prediction error:', err);
+            setError(`Prediction failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
             return null;
+        } finally {
+            setIsLoading(false);
         }
-    }, [session, flattenLandmarks]);
+    }, []);
 
-    // Reset buffer
+    // Reset frame buffer
     const resetBuffer = useCallback(() => {
         frameBuffer.current = [];
     }, []);
@@ -158,6 +150,9 @@ export function useInference(): InferenceHook {
         predict,
         isLoading,
         error,
-        resetBuffer
+        resetBuffer,
+        vocabulary,
+        isConnected,
+        testConnection
     };
 }

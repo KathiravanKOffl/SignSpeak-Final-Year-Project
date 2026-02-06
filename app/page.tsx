@@ -1,10 +1,38 @@
 'use client';
 
+import { useState } from 'react';
+import { Settings } from 'lucide-react';
 import CameraPanel from '@/components/CameraPanel';
 import ChatPanel from '@/components/ChatPanel';
 import AvatarPanel from '@/components/AvatarPanel';
+import SettingsModal from '@/components/SettingsModal';
+import { useInference } from '@/hooks/useInference';
 
 export default function Home() {
+  const [showSettings, setShowSettings] = useState(false);
+  const { testConnection } = useInference();
+
+  const handleSaveSettings = (url: string) => {
+    localStorage.setItem('backend_url', url);
+    // Refresh page to reinitialize with new URL
+    window.location.reload();
+  };
+
+  const handleTestConnection = async (url: string): Promise<boolean> => {
+    // Temporarily store URL for testing
+    const oldUrl = localStorage.getItem('backend_url');
+    localStorage.setItem('backend_url', url);
+
+    const result = await testConnection();
+
+    // Restore old URL if test failed
+    if (!result && oldUrl) {
+      localStorage.setItem('backend_url', oldUrl);
+    }
+
+    return result;
+  };
+
   return (
     <main className="min-h-screen bg-[#F8F9FA] text-slate-900 overflow-hidden flex flex-col font-sans">
 
@@ -25,9 +53,23 @@ export default function Home() {
             <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
             SYSTEM ONLINE
           </div>
-          <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200" />
+          <button
+            onClick={() => setShowSettings(true)}
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 flex items-center justify-center transition-colors"
+            title="Settings"
+          >
+            <Settings className="w-4 h-4 text-slate-600" />
+          </button>
         </div>
       </header>
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        onSave={handleSaveSettings}
+        onTest={handleTestConnection}
+      />
 
       {/* Main Content Grid */}
       <div className="flex-1 p-6 h-[calc(100vh-64px)]">

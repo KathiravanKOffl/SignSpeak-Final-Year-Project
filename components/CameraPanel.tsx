@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { Wifi, WifiOff } from 'lucide-react';
 import { useInference } from '@/hooks/useInference';
 import { useMediaPipe } from '@/hooks/useMediaPipe';
 
@@ -14,7 +15,7 @@ export default function CameraPanel() {
     const lastWordTimeRef = useRef<number>(0);
     const isDetectingRef = useRef(false);
 
-    const { predict, isLoading: modelLoading, resetBuffer, error: modelError } = useInference();
+    const { predict, isLoading: modelLoading, resetBuffer, error: modelError, isConnected } = useInference();
 
     // Update ref when state changes
     useEffect(() => {
@@ -127,7 +128,26 @@ export default function CameraPanel() {
         <div className="h-full bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
             {/* Header */}
             <div className="p-6 border-b border-slate-200">
-                <h2 className="text-xl font-bold text-slate-800">Sign Input</h2>
+                <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-bold text-slate-800">Sign Input</h2>
+                    {/* Backend Connection Status */}
+                    <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${isConnected
+                            ? 'bg-green-50 text-green-700 border border-green-200'
+                            : 'bg-amber-50 text-amber-700 border border-amber-200'
+                        }`}>
+                        {isConnected ? (
+                            <>
+                                <Wifi className="w-3 h-3" />
+                                <span>Backend Connected</span>
+                            </>
+                        ) : (
+                            <>
+                                <WifiOff className="w-3 h-3" />
+                                <span>No Backend</span>
+                            </>
+                        )}
+                    </div>
+                </div>
                 <p className="text-sm text-slate-500 mt-1">Perform signs to build your sentence</p>
             </div>
 
