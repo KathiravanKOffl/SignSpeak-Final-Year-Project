@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import type { LandmarksData } from './useMediaPipe';
 
 interface InferenceHook {
@@ -25,7 +25,9 @@ export function useInference(): InferenceHook {
     // Get backend URL from localStorage
     const getBackendUrl = (): string | null => {
         if (typeof window === 'undefined') return null;
-        return localStorage.getItem('backend_url');
+        const url = localStorage.getItem('backend_url');
+        // Remove trailing slash to prevent double-slash in URLs
+        return url ? url.replace(/\/$/, '') : null;
     };
 
     // Flatten landmarks into feature array (399 features)
@@ -88,6 +90,14 @@ export function useInference(): InferenceHook {
             setIsLoading(false);
         }
     }, []);
+
+    // Auto-connect on mount if URL exists
+    useEffect(() => {
+        const backendUrl = getBackendUrl();
+        if (backendUrl) {
+            testConnection();
+        }
+    }, [testConnection]);
 
     // Predict sign from landmarks
     const predict = useCallback(async (landmarks: LandmarksData): Promise<string | null> => {
