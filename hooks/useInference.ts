@@ -111,14 +111,26 @@ export function useInference(): InferenceHook {
         const flatFrame = flattenLandmarks(landmarks);
         frameBuffer.current.push(flatFrame);
 
-        // Need full sequence
-        if (frameBuffer.current.length < SEQUENCE_LENGTH) {
+        // Need 2 seconds of data (60 frames at 30fps)
+        const BUFFER_SIZE = 60;
+
+        if (frameBuffer.current.length < BUFFER_SIZE) {
             return null;
         }
 
-        // Keep only last 32 frames
-        while (frameBuffer.current.length > SEQUENCE_LENGTH) {
+        // Keep only last 60 frames
+        while (frameBuffer.current.length > BUFFER_SIZE) {
             frameBuffer.current.shift();
+        }
+
+        // Downsample 60 frames → 32 frames to match training
+        // Take every ~2nd frame (60/32 ≈ 1.875)
+        const downsampledSequence: number[][] = [];
+        const step = BUFFER_SIZE / SEQUENCE_LENGTH;
+
+        for (let i = 0; i < SEQUENCE_LENGTH; i++) {
+            const index = Math.floor(i * step);
+            downsampledSequence.push(frameBuffer.current[index]);
         }
 
         try {
@@ -127,7 +139,7 @@ export function useInference(): InferenceHook {
             const response = await fetch(`${backendUrl}/predict`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sequence: frameBuffer.current })
+                body: JSON.stringify({ sequence: downsampledSequence })
             });
 
             if (!response.ok) {
